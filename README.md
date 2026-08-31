@@ -1,239 +1,221 @@
 ```markdown
-# LifeOS - Personal Second Brain
+<div align="center">
+
+# 🧠 LifeOS
+### *Autonomous Local Second Brain & Multi-Modal Semantic Engine*
+
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![Qt](https://img.shields.io/badge/PySide6-Tokyo_Night_GUI-41CD52?style=for-the-badge&logo=qt&logoColor=white)](https://pypi.org/project/PySide6/)
+[![FAISS](https://img.shields.io/badge/Vector_DB-Meta_FAISS-008080?style=for-the-badge&logo=meta&logoColor=white)](https://github.com/facebookresearch/faiss)
+[![LLM Support](https://img.shields.io/badge/AI_Engine-Gemini_%7C_OpenAI-7B2CBF?style=for-the-badge&logo=openai&logoColor=white)](https://github.com/Berkay-Dmr/LifeOs)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
-  <img src="https://img.shields.io/badge/Database-SQLite3-003B57?style=flat-square&logo=sqlite&logoColor=white" alt="SQLite">
-  <img src="https://img.shields.io/badge/Vector%20Store-FAISS-008080?style=flat-square" alt="FAISS">
-  <img src="https://img.shields.io/badge/AI%20Providers-Gemini%20%7C%20OpenAI-8E75B2?style=flat-square&logo=openai&logoColor=white" alt="AI">
-  <img src="https://img.shields.io/badge/GUI-PySide6%20(Qt6)-41CD52?style=flat-square&logo=qt&logoColor=white" alt="GUI">
-  <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License">
+  <b>Yerel verilerinizi vektörleştirin, anlamsal ilişkiler kurun, AST tabanlı kod analizi yapın ve hibrit RAG ile masaüstünüzü dijital bir zihne dönüştürün.</b>
 </p>
 
-<p align="center">
-  <b>Yerel dosyalarınızı indeksleyin, içerik çıkarın, semantik arama yapın ve yapay zekâ destekli RAG motoruyla belgelerinizle etkileşime geçin.</b>
-</p>
-
-<p align="center">
-  <a href="#genel-bakış">Genel Bakış</a> •
-  <a href="#temel-özellikler">Özellikler</a> •
-  <a href="#teknoloji-yığını">Teknolojiler</a> •
-  <a href="#kurulum">Kurulum</a> •
-  <a href="#kullanım">Kullanım</a> •
-  <a href="#proje-mimarisi">Mimari</a> •
-  <a href="#güvenlik-ve-gizlilik">Güvenlik</a>
-</p>
+[✨ Özellikler](#-temel-özellikler) •
+[⚡ Hızlı Başlangıç](#-hızlı-başlangıç) •
+[🖥️ GUI & CLI](#-kullanım-paneli) •
+[🏗️ Mimari](#-derinlemesine-sistem-mimarisi) •
+[🛡️ Gizlilik & Güvenlik](#-güvenlik-ve-gizlilik)
 
 ---
 
-## Genel Bakış
+</div>
 
-**LifeOS**, kişisel bilgisayarınızdaki tüm veri akışını (kodlar, belgeler, notlar, görsel içerikler) anlamlandırıp birbirine bağlayan yerel bir **İkinci Beyin (Second Brain)** sistemidir.
+## 🌌 Sisteme Bakış
 
-Verilerinizi güvenli şekilde yerelde işler, vektör veritabanına aktarır ve hem **CLI** hem de modern **PySide6 Masaüstü Arayüzü** üzerinden semantik/hibrit aramalar yapmanıza, RAG (Retrieval-Augmented Generation) altyapısıyla belgeleriniz üzerinden sorular sormanıza olanak tanır.
+**LifeOS**, dağınık durumdaki yerel belgelerinizi, kaynak kodlarınızı, taranmış dokümanlarınızı ve günlük notlarınızı birbirine bağlayan **yüksek performanslı, yerel bir RAG (Retrieval-Augmented Generation)** ekosistemidir.
 
----
+Verileriniz diskinizde kalır; yerel embedding motorları (`sentence-transformers`) ve **Meta FAISS** vektör dizinlemesi ile tamamen makinenizde işlenir.
 
-## Temel Özellikler
 
-### 1. Çok Formatlı Doküman Çıkarımı & OCR
-- **Belgeler & Notlar:** `PDF`, `DOCX`, `TXT`, `MD`, `JSON`, `YAML`
-- **Görsel & Taramalar:** `EasyOCR` entegrasyonu ve görüntü ön işleme ile görseldeki metinleri çıkarma
-- **Kod Tabanı:** Dili tanıyan ve AST/kod mantığına göre bloklayan özel `CodeChunker`
+```
 
-### 2. Hibrit Arama & Sıralama (Hybrid Search & Ranking)
-- **Semantik Arama:** `sentence-transformers` (`all-MiniLM-L6-v2`) ve `FAISS` indeksleme
-- **Hibrit Skorlama:** Anlamsal benzerlik + anahtar kelime eşleşmesi + dosya güncelliği (recency) + meta veri ağırlıklandırması
+📁 Yerel Dosyalar ──► 🔍 Çoklu Parser / OCR ──► ✂️ Akıllı Chunker ──► 🧠 FAISS + SQLite
+│
+🖥️ PySide6 GUI / CLI ◄── 🤖 RAG Engine (Gemini / OpenAI) ◄──────────────────┘
 
-### 3. Çoklu LLM / RAG Desteği
-- **Google Gemini** ve **OpenAI** API entegrasyonu
-- Bağlam birleştirici (`ContextBuilder`) ve yanıt doğrulayıcı (`AnswerValidator`) mimarisi
-
-### 4. Bellek & Zaman Çizelgesi (Memory Engine)
-- Anlık notlar, varlık (entity) ve ilişki (relation) çıkarımı
-- Kronolojik olay takibi ve geçmiş sorgulama (`Timeline`)
-
-### 5. Arka Plan Senkronizasyonu & Güvenlik
-- Dosya değişikliklerini izleyen `Watcher` ve arka plan `Indexer` servisi
-- Sistem tepsisi (`System Tray`) entegrasyonu
-- Otomatik hassas veri (API Key, Secrets) ve gizli dizin (`.git`, `node_modules`, `data/`) filtreleme
+```
 
 ---
 
-## Teknoloji Yığını
+## ✨ Temel Özellikler
 
-| Katman | Teknoloji / Kütüphane |
-|---|---|
-| **Programlama Dili** | Python 3.11+ |
-| **Vektör Depolama** | Meta FAISS |
-| **Metin Gömme (Embedding)** | `sentence-transformers` (`all-MiniLM-L6-v2`) |
-| **İlişkisel Veritabanı** | SQLite3 (Repository Pattern, Migrations) |
-| **Masaüstü Arayüzü** | PySide6 (Qt6) — Tokyo Night Koyu Tema |
-| **Görsel İşleme / OCR** | EasyOCR + Preprocessor |
-| **CLI / Terminal** | Click + Rich |
-| **Konfigürasyon** | Pydantic Settings + `.env` |
+### 🧬 Çok Boyutlu İndeksleme & Akıllı Ayrıştırma (Extractors)
+* **Doküman Desteği:** `PDF`, `DOCX`, `Markdown`, `TXT`, `JSON`, `YAML`
+* **Görsel & OCR:** Görüntü ön işleme filtresi destekli `EasyOCR` ile görseldeki metinleri yakalama
+* **Kod Tabanı (AST Parser):** Dilden bağımsız salt metin bölmesi yerine fonksiyon ve sınıf hiyerarşisini koruyan özel `CodeChunker`
+* **Git Repository Analizi:** Commit geçmişini ve repo metadata'sını taranabilir varlıklara dönüştürme
+
+### ⚡ Hibrit Arama & Dinamik Sıralama (Hybrid Ranking)
+* **Semantik Vektör Eşleme:** `all-MiniLM-L6-v2` embeddingleri ile FAISS L2/Cosine mesafe sorguları
+* **Çok Faktörlü Skorlama:** `Score = Semantic + Keyword (BM25/TF-IDF) + Recency + Metadata Weights`
+
+### 🧠 Bilişsel Bellek & Zaman Çizelgesi (Memory Engine)
+* **Varlık (Entity) & İlişki (Relation) Çıkarımı:** Eklenen notlar arasında semantik bağ kurma
+* **Zaman Çizelgesi (Timeline):** Dosya ve notların kronolojik akışını çıkarıp sorgulayabilme
+
+### 🛡️ Gizlilik Kalkanı (Privacy Guard)
+* Otomatik Regex tabanlı API Key, Token ve Secret filtreleme
+* `.git`, `node_modules`, `venv`, `logs/`, `data/` dizinlerinin varsayılan izolasyonu
 
 ---
 
-## Kurulum
+## 🛠️ Teknoloji Yığını
 
-### 1. Repoyu Klonlayın
+| Katman | Teknoloji | Açıklama |
+|---|---|---|
+| **Çekirdek Dil** | `Python 3.11+` | Tip güvenli dataclass mimarisi, modüler yapı |
+| **Vektör Motoru** | `Meta FAISS` | Düşük gecikmeli vektör arama ve indeksleme |
+| **Embedding** | `sentence-transformers` | `all-MiniLM-L6-v2` yerel vektörleştirme |
+| **İlişkisel Veritabanı** | `SQLite3` | Repository pattern, otomatik migration katmanı |
+| **Kullanıcı Arayüzü** | `PySide6 (Qt6)` | Özelleştirilmiş Tokyo Night karanlık tema |
+| **Optik Karakter Tanıma**| `EasyOCR` | Çok dilli yerel metin okuma motoru |
+| **Terminal & CLI** | `Click` + `Rich` | Renkli loglama ve terminal araç takımı |
+
+---
+
+## ⚡ Hızlı Başlangıç
+
+### 1. Depoyu Klonlayın
+
 ```bash
 git clone [https://github.com/Berkay-Dmr/LifeOs.git](https://github.com/Berkay-Dmr/LifeOs.git)
 cd LifeOs
 
 ```
 
-### 2. Sanal Ortamı Oluşturun ve Aktif Edin
-
-**Windows (PowerShell):**
+### 2. Sanal Ortam Kurulumu
 
 ```powershell
+# Sanal ortamı oluşturun
 python -m venv venv
+
+# Aktif edin (Windows)
 .\venv\Scripts\activate
 
-```
-
-**Linux / macOS:**
-
-```bash
-python3 -m venv venv
-source venv/bin/activate
+# Aktif edin (Linux / macOS)
+# source venv/bin/activate
 
 ```
 
 ### 3. Bağımlılıkları Yükleyin
 
-```bash
+```powershell
 pip install -e .
 
 ```
 
-### 4. Ortam Değişkenlerini Tanımlayın
+### 4. Çevre Değişkenlerini Tanımlayın
 
-Kök dizindeki `.env.example` dosyasını `.env` olarak kopyalayın ve anahtarlarınızı girin:
+Kök dizinde `.env` dosyanızı oluşturun:
 
 ```env
-# AI Sağlayıcı Seçimi (gemini veya openai)
+# Aktif AI Sağlayıcısı (gemini | openai)
 LIFEOS_AI_PROVIDER=gemini
 
 # API Anahtarları
-GEMINI_API_KEY=your_gemini_api_key_here
-OPENAI_API_KEY=your_openai_api_key_here
+GEMINI_API_KEY=AIzaSy...
+OPENAI_API_KEY=sk-proj-...
 
-# İsteğe Bağlı Dizin Yapılandırması
+# İsteğe Bağlı Kök Dizin
 LIFEOS_ROOT=C:\Users\Kullanici\Belgeler
 
 ```
 
 ---
 
-## Kullanım
+## 🖥️ Kullanım Paneli
 
-### Masaüstü Arayüzü (GUI)
+### 🎨 Masaüstü Arayüzü (GUI)
 
-Modern ve karanlık temalı masaüstü kontrol panelini başlatmak için:
+Modern Qt6 tabanlı arayüzü başlatmak için:
 
 ```powershell
 lifeos gui
 
 ```
 
-Arayüz modülleri:
-
-* **Search:** Çok parametreli hibrit ve semantik belge arama
-* **Ask AI:** RAG destekli akıllı doküman asistanı
-* **Memory & Timeline:** Not ekleme, ilişki görselleştirme ve olay zaman çizelgesi
-* **Settings:** Model sağlayıcı ve dizin yapılandırma paneli
+> **Arayüz Sekmeleri:**
+> * **🔍 Search:** Hibrit filtrelemeli hızlı semantik arama konsolu.
+> * **🤖 Ask AI:** İndekslenen dokümanları bağlam olarak kullanan RAG sohbet ekranı.
+> * **🧠 Memory & Timeline:** Not ekleme, varlık ilişkilendirme ve olay kronolojisi.
+> * **⚙️ Settings:** Sağlayıcı ve sistem dizin konfigürasyonu.
+> 
+> 
 
 ---
 
-### Komut Satırı Arayüzü (CLI)
-
-#### Veritabanı & İndeksleme
+### 💻 Komut Satırı Arayüzü (CLI)
 
 ```powershell
-# Veritabanını ve tabloları başlat
+# 1. Veritabanını ve şemayı hazırla
 lifeos init
 
-# Belgeleri tara ve vektörleştir
+# 2. Belgeleri tara ve indeksle (incremental)
 lifeos index
 
-# Tüm belgeleri sıfırdan zorla indeksle
-lifeos index --force
-
-```
-
-#### Arama & AI Sorgulama
-
-```powershell
-# Hibrit arama yap
+# 3. İndekslenmiş içeriklerde semantik arama yap
 lifeos search "veritabanı bağlantı havuzu ayarları"
 
-# RAG motoru ile belgeler üzerinden soru sor
+# 4. RAG motoru üzerinden belgelerine soru sor
 lifeos ask "Projedeki veritabanı mimarisi nasıl kurgulandı?" --provider gemini
 
-```
-
-#### Bellek Yönetimi
-
-```powershell
-# Belleğe yeni bir bilgi/not ekle
+# 5. Belleğe yeni bir bilgi kaydet
 lifeos memory add "Sistem mimarisi mikroservis yapısına geçirilecek" --tags mimari,plan
 
-# Bellekten ara ve getir
+# 6. Bellekten bağlamsal geri çağırma yap
 lifeos memory recall "mikroservis"
-
-# Kayıtlı tüm bellek girdilerini listele
-lifeos memory list
 
 ```
 
 ---
 
-## Proje Mimarisi
+## 🏗️ Derinlemesine Sistem Mimarisi
 
 ```text
 lifeos/
-├── app/
-│   ├── ai/             # Gemini & OpenAI Provider, Context Builder, RAG Prompts
-│   ├── background/     # File Watcher, Auto Indexer, System Tray
-│   ├── chunking/       # Text & AST Tabanlı Code Chunker
-│   ├── cli/            # Click & Rich Tabanlı Komut Seti
-│   ├── config/         # Pydantic Tabanlı Ayar ve .env Yönetimi
-│   ├── database/       # SQLite Bağlantısı, Migrations, Repository Katmanı
-│   ├── embeddings/     # Yerel Caching ve Sentence-Transformers Altyapısı
-│   ├── extractors/     # PDF, DOCX, Markdown, Kod, JSON/YAML Parserları
-│   ├── git/            # Yerel Git Repository ve Commit İndeksleyici
-│   ├── gui/            # PySide6 Qt Pencereleri ve Tokyo Night Stilleri
-│   ├── ingestion/      # Incremental File Scanner ve Metadata Registry
-│   ├── memory/         # Entity, Relation, Timeline ve Memory Motoru
-│   ├── models/         # Tip Güvenli Veri Modelleri (Dataclasses)
-│   ├── ocr/            # EasyOCR Entegrasyonu ve Görsel Ön İşleme
-│   ├── privacy/        # Secret & API Key Tespiti, Hariç Tutma Filtreleri
-│   ├── search/         # Hibrit Sıralama, Semantik ve TF-IDF Tabanlı Arama
-│   ├── utils/          # Hashing, Logging, Metin ve Dosya Araçları
-│   └── vectorstore/    # FAISS Vektör İndeksi ve Metadata Yönetimi
-├── .env.example        # Şablon Ortam Değişkenleri
-├── pyproject.toml      # Paket ve Proje Yapılandırması
-└── requirements.txt    # Python Bağımlılık Listesi
+├── 📂 app/
+│   ├── 🤖 ai/             # LLM Entegrasyonları (Gemini & OpenAI), Context Builder, Promptlar
+│   ├── 🔄 background/     # File Watcher, Otomatik Indexer, System Tray Modülü
+│   ├── 🧩 chunking/       # Semantik Metin ve AST Tabanlı Kod Parçalayıcılar
+│   ├── 💻 cli/            # Click & Rich Tabanlı Terminal Komutları
+│   ├── ⚙️ config/         # Pydantic Settings, Ortam Değişkeni Yönetimi
+│   ├── 🗄️ database/       # SQLite Bağlantısı, Tablo Şemaları & Repository Katmanı
+│   ├── 🔢 embeddings/     # Yerel Embedding Caching ve Model Entegrasyonu
+│   ├── 📄 extractors/     # PDF, DOCX, Markdown, Kod, JSON/YAML Parserları
+│   ├── 🌿 git/            # Yerel Git Repo Tespiti ve Commit İndeksleyici
+│   ├── 🖥️ gui/            # PySide6 Pencereleri, Widget'lar ve Tokyo Night Teması
+│   ├── 📥 ingestion/      # Incremental File Scanner ve Registry
+│   ├── 🧠 memory/         # Entity, Relation ve Timeline Bellek Motoru
+│   ├── 📦 models/         # Tip Güvenli Veri Modelleri (Dataclasses)
+│   ├── 👁️ ocr/            # EasyOCR Entegrasyonu ve Görsel Ön İşleme
+│   ├── 🛡️ privacy/        # Regex Tabanlı Secret/API Key Filtresi ve Dizin İzolasyonu
+│   ├── 🔎 search/         # Hibrit Sıralama, Semantik ve TF-IDF Arama Algoritmaları
+│   ├── 🛠️ utils/          # Hashing, Logging, Metin ve Dosya Yardımcıları
+│   └── 🗃️ vectorstore/    # Meta FAISS Vektör İndeksi ve Metadata Yönetimi
+├── 📄 .env.example        # Örnek Konfigürasyon Şablonu
+├── ⚙️ pyproject.toml      # Paket ve Proje Yapılandırması
+└── 📋 requirements.txt    # Bağımlılık Listesi
 
 ```
 
 ---
 
-## Güvenlik ve Gizlilik
+## 🛡️ Güvenlik ve Gizlilik
 
-* **Yerel Veri Saklama:** Vektör indeksleri (`faiss.index`) ve ilişkisel veriler (`sqlite.db`) tamamen yerel diskinizde tutulur.
-* **Hassas Veri Filtreleme:** İndeksleme sırasında kaynak kodlar veya metinlerdeki API anahtarları, şifreler ve gizli değerler taranarak vektör tabanına aktarılmaz.
-* **Dizin İzolasyonu:** `.git`, `node_modules`, `venv`, derleme çıktıları ve loglar tarama dışı bırakılır.
+* **%100 Yerel Veri Saklama:** İndekslenen tüm metinler, FAISS vektörleri ve SQLite verileri cihazınızda şifrelenmeden veya buluta yüklenmeden yerel diskte saklanır.
+* **Secret Redaction:** İndeksleme sırasında kaynak kod veya dokümanlarda tespit edilen hassas API anahtarları otomatik olarak maskelenir.
+* **Dışarı Kapalı Mimari:** Yapay zekâ sorguları haricinde hiçbir veriniz üçüncü taraf sunuculara iletilmez.
 
 ---
 
-## Lisans
+## 📜 Lisans
 
-Bu proje **MIT Lisansı** altında lisanslanmıştır. Detaylar için `LICENSE` dosyasına bakabilirsiniz.
+Bu proje **MIT Lisansı** kapsamında sunulmaktadır. Ayrıntılar için [`LICENSE`](https://www.google.com/search?q=LICENSE) dosyasına göz atabilirsiniz.
 
-```
+---
 
-```
+⭐ **Projeyi beğendiyseniz yıldız vermeyi unutmayın!** ⭐
