@@ -1,0 +1,9 @@
+This is a plain text file about Redis caching strategies.
+
+Redis can be used for:
+- Session storage
+- Message queuing
+- Rate limiting
+- Caching database queries
+
+The main advantage is speed since Redis keeps data in memory.
