@@ -1,37 +1,35 @@
-```markdown
-<div align="center">
+<h1 align="center">🧠 LifeOS</h1>
+<p align="center">
+  <em>Autonomous Local Second Brain & Multi-Modal Semantic Engine</em>
+</p>
 
-# 🧠 LifeOS
-### *Autonomous Local Second Brain & Multi-Modal Semantic Engine*
-
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![Qt](https://img.shields.io/badge/PySide6-Tokyo_Night_GUI-41CD52?style=for-the-badge&logo=qt&logoColor=white)](https://pypi.org/project/PySide6/)
-[![FAISS](https://img.shields.io/badge/Vector_DB-Meta_FAISS-008080?style=for-the-badge&logo=meta&logoColor=white)](https://github.com/facebookresearch/faiss)
-[![LLM Support](https://img.shields.io/badge/AI_Engine-Gemini_%7C_OpenAI-7B2CBF?style=for-the-badge&logo=openai&logoColor=white)](https://github.com/Berkay-Dmr/LifeOs)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
+<p align="center">
+  <a href="https://python.org"><img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python"></a>
+  <a href="https://pypi.org/project/PySide6/"><img src="https://img.shields.io/badge/PySide6-Tokyo_Night_GUI-41CD52?style=for-the-badge&logo=qt&logoColor=white" alt="PySide6"></a>
+  <a href="https://github.com/facebookresearch/faiss"><img src="https://img.shields.io/badge/Vector_DB-Meta_FAISS-008080?style=for-the-badge&logo=meta&logoColor=white" alt="FAISS"></a>
+  <a href="https://github.com/Berkay-Dmr/LifeOs"><img src="https://img.shields.io/badge/AI_Engine-Gemini_%7C_OpenAI-7B2CBF?style=for-the-badge&logo=openai&logoColor=white" alt="AI Engine"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="License"></a>
+</p>
 
 <p align="center">
   <b>Yerel verilerinizi vektörleştirin, anlamsal ilişkiler kurun, AST tabanlı kod analizi yapın ve hibrit RAG ile masaüstünüzü dijital bir zihne dönüştürün.</b>
 </p>
 
-[✨ Özellikler](#-temel-özellikler) •
-[⚡ Hızlı Başlangıç](#-hızlı-başlangıç) •
-[🖥️ GUI & CLI](#-kullanım-paneli) •
-[🏗️ Mimari](#-derinlemesine-sistem-mimarisi) •
-[🛡️ Gizlilik & Güvenlik](#-güvenlik-ve-gizlilik)
+<p align="center">
+  <a href="#-temel-özellikler">✨ Özellikler</a> •
+  <a href="#-hızlı-başlangıç">⚡ Hızlı Başlangıç</a> •
+  <a href="#-kullanım-paneli">🖥️ GUI & CLI</a> •
+  <a href="#-derinlemesine-sistem-mimarisi">🏗️ Mimari</a> •
+  <a href="#-güvenlik-ve-gizlilik">🛡️ Güvenlik</a>
+</p>
 
 ---
-
-</div>
 
 ## 🌌 Sisteme Bakış
 
 **LifeOS**, dağınık durumdaki yerel belgelerinizi, kaynak kodlarınızı, taranmış dokümanlarınızı ve günlük notlarınızı birbirine bağlayan **yüksek performanslı, yerel bir RAG (Retrieval-Augmented Generation)** ekosistemidir.
 
 Verileriniz diskinizde kalır; yerel embedding motorları (`sentence-transformers`) ve **Meta FAISS** vektör dizinlemesi ile tamamen makinenizde işlenir.
-
-
-```
 
 📁 Yerel Dosyalar ──► 🔍 Çoklu Parser / OCR ──► ✂️ Akıllı Chunker ──► 🧠 FAISS + SQLite
 │
