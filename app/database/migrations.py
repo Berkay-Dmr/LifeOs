@@ -219,4 +219,19 @@ CREATE TABLE IF NOT EXISTS git_memory_links (
 CREATE INDEX IF NOT EXISTS idx_git_links_commit ON git_memory_links(commit_hash);
 """,
     ),
+    (
+        "007_memory_interactions",
+        """
+CREATE TABLE IF NOT EXISTS memory_interactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    memory_id INTEGER NOT NULL,
+    memory_type TEXT NOT NULL,
+    interaction_type TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (memory_id) REFERENCES documents(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_memory_interactions_id ON memory_interactions(memory_id);
+""",
+    ),
 ]

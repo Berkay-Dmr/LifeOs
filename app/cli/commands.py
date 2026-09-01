@@ -1205,6 +1205,58 @@ def find_stats():
     console.print(table)
 
 
+# ── memory score ────────────────────────────────────────────────
+
+@cli.command(name="memory-score")
+@click.option("--decay", is_flag=True, help="Apply temporal decay")
+def memory_score(decay: bool):
+    """Show memory importance scores."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.memory.advanced import get_memory_stats, apply_temporal_decay, get_important_memories
+
+    if decay:
+        affected = apply_temporal_decay()
+        console.print(f"[yellow]Applied decay to {affected} records[/yellow]\n")
+
+    stats = get_memory_stats()
+
+    table = Table(title="Memory Stats")
+    table.add_column("Metric", style="bold")
+    table.add_column("Value", justify="right")
+
+    table.add_row("Total Memories", str(stats["total_memories"]))
+    table.add_row("Average Score", f"{stats['avg_score']:.2f}")
+    table.add_row("High Importance (>0.7)", str(stats["high_importance"]))
+    table.add_row("Low Importance (<0.3)", str(stats["low_importance"]))
+    table.add_row("Stale (>30 days)", str(stats["stale_memories"]))
+
+    console.print(table)
+
+    # Top memories
+    memories = get_important_memories(limit=5)
+    if memories:
+        console.print("\n[bold]Top Important Memories:[/bold]")
+        for m in memories:
+            score = m.get("score", 0) or 0
+            console.print(f"  [{score:.2f}] {m['title'][:50]}")
+
+
+@cli.command(name="memory-consolidate")
+def memory_consolidate():
+    """Merge duplicate memories."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.memory.advanced import consolidate_memories
+
+    result = consolidate_memories()
+
+    console.print(f"[green]Merged: {result['merged']} duplicates[/green]")
+    console.print(f"[green]Kept: {result['kept']} unique memories[/green]")
+
+
 # ── bulk-delete ──────────────────────────────────────────
 
 @cli.command(name="bulk-delete")
