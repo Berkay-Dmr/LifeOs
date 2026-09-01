@@ -99,58 +99,85 @@ class AutoCompleteLineEdit(QLineEdit):
         self._popup.suggestion_selected.connect(self._on_suggestion_selected)
         self._timer = QTimer()
         self._timer.setSingleShot(True)
-        self._timer.setInterval(300)
+        self._timer.setInterval(600)
         self._timer.timeout.connect(self._fetch_suggestions)
 
         self.textChanged.connect(self._on_text_changed)
         self._popup.list_widget.installEventFilter(self)
+        self._user_is_selecting = False
 
     def _on_text_changed(self, text: str):
-        if len(text) >= 2:
+        if self._user_is_selecting:
+            return
+        # Immediately hide popup while user is typing
+        self._popup.hide()
+        if len(text) >= 4:
             self._timer.start()
         else:
-            self._popup.hide()
+            self._timer.stop()
 
     def _fetch_suggestions(self):
         """Fetch suggestions based on current text."""
         text = self.text().strip()
-        if len(text) < 2:
+        if len(text) < 4:
             self._popup.hide()
             return
 
         suggestions = self._get_suggestions(text)
-        if suggestions:
+        if suggestions and len(suggestions) > 1:
             self._popup.show_suggestions(suggestions, self)
         else:
             self._popup.hide()
 
     def _get_suggestions(self, query: str) -> list[str]:
         """Get suggestions from search history and document names."""
-        suggestions = []
+        prefix_matches = []
+        contains_matches = []
         seen = set()
+        query_lower = query.lower()
 
         # 1. Search history
         history = self._get_search_history()
         for item in history:
-            if query.lower() in item.lower() and item not in seen:
-                suggestions.append(item)
+            if item in seen:
+                continue
+            item_lower = item.lower()
+            if item_lower.startswith(query_lower):
+                prefix_matches.append(item)
+                seen.add(item)
+            elif query_lower in item_lower:
+                contains_matches.append(item)
                 seen.add(item)
 
         # 2. Document names
         doc_names = self._get_document_names()
         for name in doc_names:
-            if query.lower() in name.lower() and name not in seen:
-                suggestions.append(name)
+            if name in seen:
+                continue
+            name_lower = name.lower()
+            if name_lower.startswith(query_lower):
+                prefix_matches.append(name)
+                seen.add(name)
+            elif query_lower in name_lower:
+                contains_matches.append(name)
                 seen.add(name)
 
         # 3. Entity names
         entities = self._get_entities()
         for entity in entities:
-            if query.lower() in entity.lower() and entity not in seen:
-                suggestions.append(entity)
+            if entity in seen:
+                continue
+            entity_lower = entity.lower()
+            if entity_lower.startswith(query_lower):
+                prefix_matches.append(entity)
+                seen.add(entity)
+            elif query_lower in entity_lower:
+                contains_matches.append(entity)
                 seen.add(entity)
 
-        return suggestions[:8]
+        # Prefix matches first, then contains
+        all_suggestions = prefix_matches + contains_matches
+        return all_suggestions[:6]
 
     def _get_search_history(self) -> list[str]:
         """Get recent search queries from chat sessions."""
@@ -189,10 +216,11 @@ class AutoCompleteLineEdit(QLineEdit):
             return []
 
     def _on_suggestion_selected(self, suggestion: str):
+        self._user_is_selecting = True
         self.setText(suggestion)
+        self._user_is_selecting = False
         self._popup.hide()
-        # Trigger search
-        self.returnPressed.emit()
+        self.setFocus()
 
     def eventFilter(self, obj, event):
         """Filter events for the popup list widget."""
