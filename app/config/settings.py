@@ -1,62 +1,63 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Optional
 
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
+class LifeOSSettings:
+    """Settings class without pydantic dependency."""
 
-class LifeOSSettings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        env_prefix="LIFEOS_",
-        extra="ignore",
-    )
+    def __init__(self):
+        # Load .env file manually
+        self._load_env()
 
-    # Paths
-    root_directory: Optional[str] = Field(
-        default=None,
-        description="Root directory to index. Set via 'lifeos init'.",
-    )
-    data_dir: str = Field(
-        default="data",
-        description="Directory for database, vectors, and cache.",
-    )
-    log_level: str = Field(default="INFO", description="Logging level.")
+        # Paths
+        self.root_directory: Optional[str] = os.getenv("LIFEOS_ROOT_DIRECTORY") or os.getenv("LIFEOS_ROOT")
+        self.data_dir: str = os.getenv("LIFEOS_DATA_DIR", "data")
+        self.log_level: str = os.getenv("LIFEOS_LOG_LEVEL", "INFO")
 
-    # Indexing
-    max_file_size_mb: int = Field(
-        default=50, description="Max file size in MB to index."
-    )
+        # Indexing
+        self.max_file_size_mb: int = int(os.getenv("LIFEOS_MAX_FILE_SIZE_MB", "50"))
 
-    # Chunking
-    chunk_size: int = Field(
-        default=800, description="Chunk size in tokens (approx)."
-    )
-    chunk_overlap: int = Field(
-        default=100, description="Overlap between chunks in tokens."
-    )
+        # Chunking
+        self.chunk_size: int = int(os.getenv("LIFEOS_CHUNK_SIZE", "800"))
+        self.chunk_overlap: int = int(os.getenv("LIFEOS_CHUNK_OVERLAP", "100"))
 
-    # Search
-    search_top_k: int = Field(default=10, description="Number of search results.")
-    semantic_weight: float = Field(default=0.55)
-    keyword_weight: float = Field(default=0.25)
-    recency_weight: float = Field(default=0.10)
-    metadata_weight: float = Field(default=0.10)
+        # Search
+        self.search_top_k: int = int(os.getenv("LIFEOS_SEARCH_TOP_K", "10"))
+        self.semantic_weight: float = float(os.getenv("LIFEOS_SEMANTIC_WEIGHT", "0.55"))
+        self.keyword_weight: float = float(os.getenv("LIFEOS_KEYWORD_WEIGHT", "0.25"))
+        self.recency_weight: float = float(os.getenv("LIFEOS_RECENCY_WEIGHT", "0.10"))
+        self.metadata_weight: float = float(os.getenv("LIFEOS_METADATA_WEIGHT", "0.10"))
 
-    # AI
-    ai_provider: str = Field(default="auto", description="AI provider: auto, openai, gemini")
-    openai_api_key: str = Field(default="", description="OpenAI API key.", alias="OPENAI_API_KEY")
-    openai_model: str = Field(default="gpt-4o-mini", description="OpenAI model.", alias="OPENAI_MODEL")
-    gemini_api_key: str = Field(default="", description="Google Gemini API key.", alias="GEMINI_API_KEY")
-    gemini_model: str = Field(default="gemini-2.5-flash", description="Gemini model.", alias="GEMINI_MODEL")
-    max_context_chunks: int = Field(default=8, description="Max chunks in AI context.")
+        # AI - read from env directly (no prefix for API keys)
+        self.ai_provider: str = os.getenv("LIFEOS_AI_PROVIDER", "auto")
+        self.openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
+        self.openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        self.gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
+        self.gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        self.max_context_chunks: int = int(os.getenv("LIFEOS_MAX_CONTEXT_CHUNKS", "8"))
 
-    # Privacy
-    redact_secrets: bool = Field(default=True)
-    local_only: bool = Field(default=False)
+        # Privacy
+        self.redact_secrets: bool = os.getenv("LIFEOS_REDACT_SECRETS", "true").lower() == "true"
+        self.local_only: bool = os.getenv("LIFEOS_LOCAL_ONLY", "false").lower() == "true"
+
+    def _load_env(self):
+        """Load .env file manually."""
+        env_paths = [Path(".env"), Path.home() / ".lifeos" / ".env"]
+        for env_path in env_paths:
+            if env_path.exists():
+                with open(env_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            key, _, value = line.partition("=")
+                            key = key.strip()
+                            value = value.strip().strip('"').strip("'")
+                            if key and key not in os.environ:
+                                os.environ[key] = value
+                break
 
     @property
     def root_path(self) -> Optional[Path]:
