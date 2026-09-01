@@ -1115,6 +1115,96 @@ def decision_check(title: str):
         )
 
 
+# ── find (global search) ─────────────────────────────────────
+
+@cli.command()
+@click.argument("query")
+def find(query: str):
+    """Find anything across your knowledge base."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.search.global_search import global_search, get_search_stats
+
+    console.print(f'[cyan]Finding:[/cyan] "{query}"\n')
+
+    results = global_search(query)
+
+    total = sum(len(v) for v in results.values())
+    if total == 0:
+        console.print("[dim]No results found.[/dim]")
+        return
+
+    # Stats
+    stats = get_search_stats()
+    console.print(f"[dim]Searching across: {stats.get('files', 0)} files, "
+                  f"{stats.get('bugs', 0)} bugs, "
+                  f"{stats.get('decisions', 0)} decisions[/dim]\n")
+
+    # Files
+    if results["files"]:
+        console.print("[bold cyan]Files:[/bold cyan]")
+        for r in results["files"][:5]:
+            console.print(f"  {r.title} — {r.snippet[:50]}")
+        console.print()
+
+    # Bugs
+    if results["bugs"]:
+        console.print("[bold red]Bugs:[/bold red]")
+        for r in results["bugs"][:3]:
+            status = r.metadata.get("status", "?")
+            console.print(f"  [{status}] {r.title}")
+        console.print()
+
+    # Decisions
+    if results["decisions"]:
+        console.print("[bold yellow]Decisions:[/bold yellow]")
+        for r in results["decisions"][:3]:
+            console.print(f"  {r.title} ({r.metadata.get('date', '')})")
+        console.print()
+
+    # Memory
+    if results["memory"]:
+        console.print("[bold green]Memory:[/bold green]")
+        for r in results["memory"][:3]:
+            console.print(f"  {r.title}")
+        console.print()
+
+    # Commits
+    if results["commits"]:
+        console.print("[bold blue]Commits:[/bold blue]")
+        for r in results["commits"][:3]:
+            console.print(f"  {r.title}: {r.snippet[:50]}")
+        console.print()
+
+    # Tasks
+    if results["tasks"]:
+        console.print("[bold magenta]Tasks:[/bold magenta]")
+        for r in results["tasks"][:3]:
+            console.print(f"  {r.title}")
+        console.print()
+
+
+@cli.command(name="find-stats")
+def find_stats():
+    """Show statistics about searchable content."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.search.global_search import get_search_stats
+
+    stats = get_search_stats()
+
+    table = Table(title="Knowledge Base Stats")
+    table.add_column("Type", style="bold")
+    table.add_column("Count", justify="right")
+
+    for key, value in stats.items():
+        table.add_row(key.replace("_", " ").title(), str(value))
+
+    console.print(table)
+
+
 # ── bulk-delete ──────────────────────────────────────────
 
 @cli.command(name="bulk-delete")
