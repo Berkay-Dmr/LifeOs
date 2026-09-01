@@ -859,6 +859,110 @@ def bug_list(project: str | None, resolved: bool):
     console.print(table)
 
 
+# ── git-link ─────────────────────────────────────────────────
+
+@cli.command(name="git-link")
+@click.argument("commit_hash")
+@click.option("--bug", "-b", help="Link to bug ID")
+@click.option("--decision", "-d", help="Link to decision ID")
+@click.option("--memory", "-m", help="Link to memory event ID")
+@click.option("--type", "-t", "link_type", default="relates_to", help="Link type")
+def git_link(commit_hash: str, bug: str | None, decision: str | None, memory: str | None, link_type: str):
+    """Link a git commit to a bug, decision, or memory."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.git.memory_linker import link_commit_to_memory
+
+    if not bug and not decision and not memory:
+        console.print("[red]Specify at least one: --bug, --decision, or --memory[/red]")
+        return
+
+    link_commit_to_memory(
+        commit_hash=commit_hash,
+        memory_event_id=memory,
+        decision_id=decision,
+        bug_id=bug,
+        link_type=link_type,
+    )
+
+    console.print(f"[green]Commit {commit_hash[:8]} linked.[/green]")
+
+
+@cli.command(name="git-links")
+@click.argument("commit_hash")
+def git_links(commit_hash: str):
+    """Show all memory links for a commit."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.git.memory_linker import get_commit_links
+
+    links = get_commit_links(commit_hash)
+
+    if not links:
+        console.print("[dim]No links found for this commit.[/dim]")
+        return
+
+    for link in links:
+        console.print(f"\n[bold]{link['link_type']}[/bold]")
+
+        if link["memory"]:
+            console.print(f"  Memory: {link['memory']['title']} ({link['memory']['type']})")
+        if link["decision"]:
+            console.print(f"  Decision: {link['decision']['title']} [{link['decision']['status']}]")
+        if link["bug"]:
+            status = "resolved" if link["bug"]["resolved"] else "open"
+            console.print(f"  Bug: {link['bug']['title']} ({status})")
+
+
+# ── code-deps ────────────────────────────────────────────────
+
+@cli.command(name="code-deps")
+@click.argument("file_path")
+def code_deps(file_path: str):
+    """Show dependencies for a code file."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.code_intelligence.dependencies import get_file_dependencies
+
+    deps = get_file_dependencies(file_path)
+
+    if not deps:
+        console.print("[dim]No dependencies found.[/dim]")
+        return
+
+    table = Table(title=f"Dependencies: {file_path}")
+    table.add_column("Type", style="cyan")
+    table.add_column("Target", style="bold")
+
+    for dep in deps:
+        target = dep["calls_function"] or dep["calls_file"] or "-"
+        table.add_row(dep["dependency_type"], target)
+
+    console.print(table)
+
+
+@cli.command(name="code-index")
+@click.argument("path", required=False)
+def code_index(path: str | None):
+    """Index code dependencies in a directory."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    scan_path = path or str(settings.root_path)
+    if not scan_path:
+        console.print("[red]Path not set.[/red]")
+        return
+
+    from app.code_intelligence.dependencies import index_directory_dependencies
+
+    console.print(f"[cyan]Indexing dependencies in:[/cyan] {scan_path}")
+    count = index_directory_dependencies(scan_path)
+    console.print(f"[green]Indexed {count} dependencies.[/green]")
+
+
 # ── bulk-delete ──────────────────────────────────────────
 
 @cli.command(name="bulk-delete")
