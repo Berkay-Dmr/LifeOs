@@ -172,6 +172,12 @@ def index(verbose: bool, force: bool) -> None:
     console.print(table)
     console.print("\n[bold green]Done.[/bold green]")
 
+    # Log notification
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("Index completed: %d new, %d changed, %d skipped",
+                stats.new, stats.changed, stats.skipped)
+
 
 # ── search ─────────────────────────────────────────────────
 
@@ -806,6 +812,8 @@ def watch(no_tray: bool) -> None:
 
     def on_index_complete(msg: str):
         console.print(f"  [green]{msg}[/green]")
+        # Log for notification system
+        logger.info("Auto-index: %s", msg)
 
     indexer = BackgroundIndexer(root, on_complete=on_index_complete)
     indexer.start()

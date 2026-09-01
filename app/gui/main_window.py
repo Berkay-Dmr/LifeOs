@@ -14,6 +14,7 @@ from app.gui.ask_widget import AskWidget
 from app.gui.memory_widget import MemoryWidget
 from app.gui.timeline_widget import TimelineWidget
 from app.gui.settings_widget import SettingsWidget
+from app.gui.notifications import notifications
 
 
 class SidebarButton(QPushButton):
@@ -37,6 +38,9 @@ class MainWindow(QMainWindow):
 
         # Apply dark theme
         self.setStyleSheet(DARK_THEME)
+
+        # Initialize notification manager
+        notifications.set_parent(self)
 
         self._init_ui()
 
