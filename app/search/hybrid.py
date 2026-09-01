@@ -14,6 +14,23 @@ def hybrid_search(query: SearchQuery, settings: LifeOSSettings) -> list[SearchRe
     results: list[SearchResult] = []
     seen: set[str] = set()
 
+    # File type filter extensions
+    file_type_map = {
+        "pdf": [".pdf"],
+        "doc": [".docx", ".doc", ".txt", ".md", ".rtf"],
+        "code": [".py", ".js", ".ts", ".java", ".c", ".cpp", ".cs", ".go", ".rs", ".rb", ".php", ".html", ".css", ".json", ".yaml", ".yml", ".toml"],
+        "image": [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp"],
+    }
+    filter_exts = None
+    if query.file_type and query.file_type in file_type_map:
+        filter_exts = file_type_map[query.file_type]
+
+    def _matches_filter(doc_path: str) -> bool:
+        if not filter_exts:
+            return True
+        path_lower = doc_path.lower()
+        return any(path_lower.endswith(ext) for ext in filter_exts)
+
     # 1. Semantic search (if FAISS available)
     try:
         from app.search.semantic import semantic_search
@@ -21,6 +38,8 @@ def hybrid_search(query: SearchQuery, settings: LifeOSSettings) -> list[SearchRe
             query.text, top_k=query.top_k * 2, settings=settings
         )
         for r in semantic_results:
+            if not _matches_filter(r.path):
+                continue
             key = f"{r.document_id}:{r.chunk_id}"
             if key not in seen:
                 seen.add(key)
@@ -76,7 +95,7 @@ def hybrid_search(query: SearchQuery, settings: LifeOSSettings) -> list[SearchRe
             if key not in seen:
                 seen.add(key)
                 doc = get_document_by_id(chunk.document_id)
-                if doc:
+                if doc and _matches_filter(doc.path):
                     results.append(SearchResult(
                         document_id=chunk.document_id,
                         chunk_id=chunk.id,
@@ -95,6 +114,8 @@ def hybrid_search(query: SearchQuery, settings: LifeOSSettings) -> list[SearchRe
         try:
             from app.database.repositories import list_documents
             for doc in list_documents():
+                if not _matches_filter(doc.path):
+                    continue
                 score = 0.0
                 if query_lower in doc.name.lower():
                     score = 0.6

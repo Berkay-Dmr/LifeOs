@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
     QLabel, QFrame, QPushButton, QScrollArea, QSizePolicy,
     QTextBrowser, QListWidget, QListWidgetItem, QSplitter,
+    QComboBox,
 )
 from PySide6.QtCore import Qt, Signal, QThread
 from PySide6.QtGui import QFont
@@ -69,10 +70,11 @@ class AskWorker(QThread):
     finished = Signal(str, list)
     error = Signal(str)
 
-    def __init__(self, question: str, chat_history: list):
+    def __init__(self, question: str, chat_history: list, file_type: str = None):
         super().__init__()
         self.question = question
         self.chat_history = chat_history
+        self.file_type = file_type
 
     def run(self):
         try:
@@ -86,7 +88,7 @@ class AskWorker(QThread):
             settings = get_settings()
             init_db(settings.db_path)
 
-            sq = SearchQuery(text=self.question, top_k=8)
+            sq = SearchQuery(text=self.question, top_k=8, file_type=self.file_type)
             search_results = hybrid_search(sq, settings)
 
             if not search_results:
@@ -220,6 +222,12 @@ class AskWidget(QWidget):
         input_layout = QHBoxLayout()
         input_layout.setSpacing(8)
 
+        self.file_filter = QComboBox()
+        self.file_filter.addItems(["Tümü", "PDF", "Belge", "Kod", "Görsel"])
+        self.file_filter.setFixedWidth(100)
+        self.file_filter.setStyleSheet("QComboBox { padding: 4px; }")
+        input_layout.addWidget(self.file_filter)
+
         self.ask_input = QLineEdit()
         self.ask_input.setObjectName("askInput")
         self.ask_input.setPlaceholderText("Sorunuzu yazın...")
@@ -311,6 +319,10 @@ class AskWidget(QWidget):
         if self._worker and self._worker.isRunning():
             return
 
+        # Get file type filter
+        filter_map = {0: None, 1: "pdf", 2: "doc", 3: "code", 4: "image"}
+        file_type = filter_map.get(self.file_filter.currentIndex())
+
         # Create session if needed
         if not self._current_session_id:
             from app.database.repositories import create_chat_session
@@ -332,7 +344,7 @@ class AskWidget(QWidget):
         self.ask_btn.setEnabled(False)
 
         # Start AI worker
-        self._worker = AskWorker(question, self._chat_history[:-1])  # history without current
+        self._worker = AskWorker(question, self._chat_history[:-1], file_type)
         self._worker.finished.connect(self._on_answer)
         self._worker.error.connect(self._on_error)
         self._worker.start()

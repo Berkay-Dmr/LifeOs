@@ -3,8 +3,9 @@ from __future__ import annotations
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
     QLabel, QFrame, QPushButton, QScrollArea, QSizePolicy,
+    QButtonGroup,
 )
-from PySide6.QtCore import Qt, Signal, QTimer, QThread
+from PySide6.QtCore import Qt, Signal, QThread
 
 import logging
 
@@ -55,12 +56,13 @@ class ResultCard(QFrame):
 
 class SearchWorker(QThread):
     """Background thread for search operation."""
-    finished = Signal(list)  # results
-    error = Signal(str)  # error message
+    finished = Signal(list)
+    error = Signal(str)
 
-    def __init__(self, query: str):
+    def __init__(self, query: str, file_type: str = None):
         super().__init__()
         self.query = query
+        self.file_type = file_type
 
     def run(self):
         try:
@@ -72,7 +74,7 @@ class SearchWorker(QThread):
             settings = get_settings()
             init_db(settings.db_path)
 
-            sq = SearchQuery(text=self.query, top_k=15)
+            sq = SearchQuery(text=self.query, top_k=15, file_type=self.file_type)
             results = hybrid_search(sq, settings)
             self.finished.emit(results)
 
@@ -82,14 +84,15 @@ class SearchWorker(QThread):
 
 
 class SearchWidget(QWidget):
-    """Search page widget."""
+    """Search page widget with file type filter."""
 
-    result_clicked = Signal(str)  # file path
+    result_clicked = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._results: list = []
         self._worker = None
+        self._current_filter = None
         self._init_ui()
 
     def _init_ui(self):
@@ -105,6 +108,7 @@ class SearchWidget(QWidget):
         subtitle.setObjectName("subtitleLabel")
         layout.addWidget(subtitle)
 
+        # Search bar
         search_layout = QHBoxLayout()
         search_layout.setSpacing(8)
 
@@ -121,10 +125,48 @@ class SearchWidget(QWidget):
 
         layout.addLayout(search_layout)
 
+        # File type filter buttons
+        filter_layout = QHBoxLayout()
+        filter_layout.setSpacing(4)
+
+        filter_label = QLabel("Filtre:")
+        filter_label.setStyleSheet("color: #787c99; font-size: 12px;")
+        filter_layout.addWidget(filter_label)
+
+        self.filter_group = QButtonGroup(self)
+        self.filter_group.setExclusive(True)
+
+        filters = [
+            ("Tümü", None),
+            ("PDF", "pdf"),
+            ("Belge", "doc"),
+            ("Kod", "code"),
+            ("Görsel", "image"),
+        ]
+
+        for label, value in filters:
+            btn = QPushButton(label)
+            btn.setCheckable(True)
+            if value is None:
+                btn.setChecked(True)
+            btn.setStyleSheet(
+                "QPushButton { padding: 4px 12px; border-radius: 4px; font-size: 12px; }"
+                "QPushButton:checked { background: #7aa2f7; color: white; }"
+                "QPushButton:!checked { background: #333; color: #aaa; }"
+            )
+            self.filter_group.addButton(btn, id=filters.index((label, value)))
+            btn.clicked.connect(lambda checked, v=value: self._set_filter(v))
+            filter_layout.addWidget(btn)
+
+        filter_layout.addStretch()
+        layout.addLayout(filter_layout)
+
+        # Results count
         self.count_label = QLabel("")
         self.count_label.setObjectName("subtitleLabel")
         layout.addWidget(self.count_label)
 
+        # Results area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -138,6 +180,9 @@ class SearchWidget(QWidget):
         scroll.setWidget(self.results_container)
         layout.addWidget(scroll)
 
+    def _set_filter(self, file_type: str):
+        self._current_filter = file_type
+
     def _on_search(self):
         query = self.search_input.text().strip()
         if not query:
@@ -147,7 +192,7 @@ class SearchWidget(QWidget):
 
         self.search_btn.setEnabled(False)
         self.count_label.setText("Araniyor...")
-        self._worker = SearchWorker(query)
+        self._worker = SearchWorker(query, self._current_filter)
         self._worker.finished.connect(self._on_results)
         self._worker.error.connect(self._on_error)
         self._worker.start()
@@ -167,7 +212,8 @@ class SearchWidget(QWidget):
                 item.widget().deleteLater()
 
         self._results = results
-        self.count_label.setText(f"{len(results)} sonuc bulundu")
+        filter_text = f" ({self._current_filter})" if self._current_filter else ""
+        self.count_label.setText(f"{len(results)} sonuc bulundu{filter_text}")
 
         for r in results:
             if hasattr(r, "path"):
