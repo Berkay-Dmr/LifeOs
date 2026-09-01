@@ -1356,6 +1356,35 @@ def graph_path(source: str, target: str):
             console.print(f"  {label}")
 
 
+# ── API server ────────────────────────────────────────────────────
+
+@cli.command()
+@click.option("--host", default="0.0.0.0", help="Host to bind")
+@click.option("--port", default=8000, help="Port to bind")
+def api(host: str, port: int):
+    """Start REST API server for mobile access."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.api.server import LifeOSServer
+
+    server = LifeOSServer(host=host, port=port)
+    server.start()
+
+    console.print(f"[bold green]LifeOS API server started![/bold green]")
+    console.print(f"[dim]Endpoint: http://{host}:{port}[/dim]")
+    console.print(f"[dim]Health: http://{host}:{port}/api/health[/dim]")
+    console.print(f"\nPress Ctrl+C to stop\n")
+
+    try:
+        import time
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        server.stop()
+        console.print("[yellow]Server stopped[/yellow]")
+
+
 # ── bulk-delete ──────────────────────────────────────────
 
 @cli.command(name="bulk-delete")
