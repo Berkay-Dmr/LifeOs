@@ -3,9 +3,10 @@ from __future__ import annotations
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
     QLabel, QFrame, QPushButton, QScrollArea, QSizePolicy,
-    QButtonGroup,
+    QButtonGroup, QDateEdit, QComboBox,
 )
-from PySide6.QtCore import Qt, Signal, QThread
+from PySide6.QtCore import Qt, Signal, QThread, QDate
+from PySide6.QtGui import QFont
 
 import logging
 
@@ -59,10 +60,15 @@ class SearchWorker(QThread):
     finished = Signal(list)
     error = Signal(str)
 
-    def __init__(self, query: str, file_type: str = None):
+    def __init__(self, query: str, file_type: str = None,
+                 date_from: str = None, date_to: str = None,
+                 filename: str = None):
         super().__init__()
         self.query = query
         self.file_type = file_type
+        self.date_from = date_from
+        self.date_to = date_to
+        self.filename = filename
 
     def run(self):
         try:
@@ -74,7 +80,14 @@ class SearchWorker(QThread):
             settings = get_settings()
             init_db(settings.db_path)
 
-            sq = SearchQuery(text=self.query, top_k=15, file_type=self.file_type)
+            sq = SearchQuery(
+                text=self.query,
+                top_k=15,
+                file_type=self.file_type,
+                date_from=self.date_from,
+                date_to=self.date_to,
+                filename=self.filename,
+            )
             results = hybrid_search(sq, settings)
             self.finished.emit(results)
 
@@ -84,7 +97,7 @@ class SearchWorker(QThread):
 
 
 class SearchWidget(QWidget):
-    """Search page widget with file type filter."""
+    """Search page widget with advanced filters."""
 
     result_clicked = Signal(str)
 
@@ -98,15 +111,11 @@ class SearchWidget(QWidget):
     def _init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(32, 24, 32, 24)
-        layout.setSpacing(16)
+        layout.setSpacing(12)
 
         title = QLabel("Search")
         title.setObjectName("titleLabel")
         layout.addWidget(title)
-
-        subtitle = QLabel("Search across all your indexed files")
-        subtitle.setObjectName("subtitleLabel")
-        layout.addWidget(subtitle)
 
         # Search bar
         search_layout = QHBoxLayout()
@@ -129,7 +138,7 @@ class SearchWidget(QWidget):
         filter_layout = QHBoxLayout()
         filter_layout.setSpacing(4)
 
-        filter_label = QLabel("Filtre:")
+        filter_label = QLabel("Tur:")
         filter_label.setStyleSheet("color: #787c99; font-size: 12px;")
         filter_layout.addWidget(filter_label)
 
@@ -137,11 +146,11 @@ class SearchWidget(QWidget):
         self.filter_group.setExclusive(True)
 
         filters = [
-            ("Tümü", None),
+            ("Tumu", None),
             ("PDF", "pdf"),
             ("Belge", "doc"),
             ("Kod", "code"),
-            ("Görsel", "image"),
+            ("Gorsel", "image"),
         ]
 
         for label, value in filters:
@@ -160,6 +169,61 @@ class SearchWidget(QWidget):
 
         filter_layout.addStretch()
         layout.addLayout(filter_layout)
+
+        # Advanced filters (collapsible)
+        advanced_frame = QFrame()
+        advanced_frame.setStyleSheet("QFrame { border: 1px solid #333; border-radius: 4px; padding: 8px; }")
+        advanced_layout = QVBoxLayout(advanced_frame)
+        advanced_layout.setSpacing(8)
+
+        advanced_title = QLabel("Gelismisi Filtreler")
+        advanced_title.setStyleSheet("font-weight: bold; color: #7aa2f7; font-size: 12px;")
+        advanced_layout.addWidget(advanced_title)
+
+        # Date range
+        date_layout = QHBoxLayout()
+        date_layout.setSpacing(8)
+
+        date_from_label = QLabel("Baslangic:")
+        date_from_label.setStyleSheet("font-size: 12px;")
+        date_layout.addWidget(date_from_label)
+
+        self.date_from = QDateEdit()
+        self.date_from.setCalendarPopup(True)
+        self.date_from.setDisplayFormat("yyyy-MM-dd")
+        self.date_from.setDate(self.date_from.date().addYears(-1))
+        self.date_from.setStyleSheet("font-size: 12px;")
+        date_layout.addWidget(self.date_from)
+
+        date_to_label = QLabel("Bitis:")
+        date_to_label.setStyleSheet("font-size: 12px;")
+        date_layout.addWidget(date_to_label)
+
+        self.date_to = QDateEdit()
+        self.date_to.setCalendarPopup(True)
+        self.date_to.setDisplayFormat("yyyy-MM-dd")
+        self.date_to.setStyleSheet("font-size: 12px;")
+        date_layout.addWidget(self.date_to)
+
+        date_layout.addStretch()
+        advanced_layout.addLayout(date_layout)
+
+        # Filename search
+        filename_layout = QHBoxLayout()
+        filename_layout.setSpacing(8)
+
+        filename_label = QLabel("Dosya adi:")
+        filename_label.setStyleSheet("font-size: 12px;")
+        filename_layout.addWidget(filename_label)
+
+        self.filename_input = QLineEdit()
+        self.filename_input.setPlaceholderText("Dosya adinda ara...")
+        self.filename_input.setStyleSheet("font-size: 12px;")
+        filename_layout.addWidget(self.filename_input)
+
+        advanced_layout.addLayout(filename_layout)
+
+        layout.addWidget(advanced_frame)
 
         # Results count
         self.count_label = QLabel("")
@@ -190,9 +254,20 @@ class SearchWidget(QWidget):
         if self._worker and self._worker.isRunning():
             return
 
+        # Get advanced filters
+        date_from = self.date_from.date().toString("yyyy-MM-dd")
+        date_to = self.date_to.date().toString("yyyy-MM-dd")
+        filename = self.filename_input.text().strip() or None
+
         self.search_btn.setEnabled(False)
         self.count_label.setText("Araniyor...")
-        self._worker = SearchWorker(query, self._current_filter)
+        self._worker = SearchWorker(
+            query,
+            self._current_filter,
+            date_from=date_from,
+            date_to=date_to,
+            filename=filename,
+        )
         self._worker.finished.connect(self._on_results)
         self._worker.error.connect(self._on_error)
         self._worker.start()

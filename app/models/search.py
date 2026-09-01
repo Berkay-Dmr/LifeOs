@@ -22,7 +22,10 @@ class SearchQuery:
     top_k: int = 10
     file_type: str | None = None
     folder: str | None = None
-    date_from: str | None = None
-    date_to: str | None = None
+    date_from: str | None = None  # YYYY-MM-DD
+    date_to: str | None = None    # YYYY-MM-DD
+    min_size: int | None = None   # bytes
+    max_size: int | None = None   # bytes
+    filename: str | None = None   # search in filename
     project: str | None = None
     language: str | None = None

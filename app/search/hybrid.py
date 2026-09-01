@@ -47,7 +47,7 @@ def hybrid_search(query: SearchQuery, settings: LifeOSSettings) -> list[SearchRe
     results: list[SearchResult] = []
     seen: set[str] = set()
 
-    # File type filter extensions
+    # Build all filters
     file_type_map = {
         "pdf": [".pdf"],
         "doc": [".docx", ".doc", ".txt", ".md", ".rtf"],
@@ -58,11 +58,43 @@ def hybrid_search(query: SearchQuery, settings: LifeOSSettings) -> list[SearchRe
     if query.file_type and query.file_type in file_type_map:
         filter_exts = file_type_map[query.file_type]
 
-    def _matches_filter(doc_path: str) -> bool:
-        if not filter_exts:
-            return True
-        path_lower = doc_path.lower()
-        return any(path_lower.endswith(ext) for ext in filter_exts)
+    def _matches_all_filters(doc) -> bool:
+        """Check all filters against a document."""
+        doc_path = doc.path if hasattr(doc, "path") else doc.get("path", "")
+
+        # File type filter
+        if filter_exts:
+            if not any(doc_path.lower().endswith(ext) for ext in filter_exts):
+                return False
+
+        # Filename filter
+        if query.filename:
+            if query.filename.lower() not in doc_path.lower():
+                return False
+
+        # Folder filter
+        if query.folder:
+            if query.folder.lower() not in doc_path.lower():
+                return False
+
+        # Date filters (check modified_at)
+        if hasattr(doc, "modified_at") and doc.modified_at:
+            mod_date = doc.modified_at
+            if isinstance(mod_date, str):
+                mod_date = mod_date[:10]  # YYYY-MM-DD
+            if query.date_from and str(mod_date) < query.date_from:
+                return False
+            if query.date_to and str(mod_date) > query.date_to:
+                return False
+
+        # Size filters (check size attribute)
+        if hasattr(doc, "size"):
+            if query.min_size and doc.size < query.min_size:
+                return False
+            if query.max_size and doc.size > query.max_size:
+                return False
+
+        return True
 
     # 1. Semantic search with query expansion
     try:
@@ -74,7 +106,7 @@ def hybrid_search(query: SearchQuery, settings: LifeOSSettings) -> list[SearchRe
                 expanded, top_k=query.top_k, settings=settings
             )
             for r in semantic_results:
-                if not _matches_filter(r.path):
+                if not _matches_all_filters(r):
                     continue
                 key = f"{r.document_id}:{r.chunk_id}"
                 if key not in seen:
@@ -131,7 +163,7 @@ def hybrid_search(query: SearchQuery, settings: LifeOSSettings) -> list[SearchRe
             if key not in seen:
                 seen.add(key)
                 doc = get_document_by_id(chunk.document_id)
-                if doc and _matches_filter(doc.path):
+                if doc and _matches_all_filters(doc):
                     results.append(SearchResult(
                         document_id=chunk.document_id,
                         chunk_id=chunk.id,
@@ -150,7 +182,7 @@ def hybrid_search(query: SearchQuery, settings: LifeOSSettings) -> list[SearchRe
         try:
             from app.database.repositories import list_documents
             for doc in list_documents():
-                if not _matches_filter(doc.path):
+                if not _matches_all_filters(doc):
                     continue
                 score = 0.0
                 if query_lower in doc.name.lower():
