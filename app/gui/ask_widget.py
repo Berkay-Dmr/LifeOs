@@ -48,7 +48,6 @@ class AnswerCard(QFrame):
             layout.addWidget(sources_label)
 
             for i, src in enumerate(sources[:5], 1):
-                # Support both SearchResult dataclass and dict
                 if hasattr(src, "path"):
                     path = src.path
                     score = src.score
@@ -73,7 +72,6 @@ class AskWidget(QWidget):
         layout.setContentsMargins(32, 24, 32, 24)
         layout.setSpacing(16)
 
-        # Title
         title = QLabel("Ask AI")
         title.setObjectName("titleLabel")
         layout.addWidget(title)
@@ -82,7 +80,6 @@ class AskWidget(QWidget):
         subtitle.setObjectName("subtitleLabel")
         layout.addWidget(subtitle)
 
-        # Ask bar
         ask_layout = QHBoxLayout()
         ask_layout.setSpacing(8)
 
@@ -99,12 +96,10 @@ class AskWidget(QWidget):
 
         layout.addLayout(ask_layout)
 
-        # Status
         self.status_label = QLabel("")
         self.status_label.setObjectName("subtitleLabel")
         layout.addWidget(self.status_label)
 
-        # Results area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -122,7 +117,6 @@ class AskWidget(QWidget):
         question = self.ask_input.text().strip()
         if not question:
             return
-
         self.status_label.setText("Thinking...")
         QTimer.singleShot(10, lambda: self._do_ask(question))
 
@@ -138,7 +132,6 @@ class AskWidget(QWidget):
             settings = get_settings()
             init_db(settings.db_path)
 
-            # Search for relevant sources
             sq = SearchQuery(text=question, top_k=8)
             search_results = hybrid_search(sq, settings)
 
@@ -146,28 +139,35 @@ class AskWidget(QWidget):
                 self._show_answer("No relevant information found in your knowledge base.", [])
                 return
 
-            # Build context and prompt
             context = build_context(search_results)
 
-            # Try AI answer using Gemini (primary) or auto-detect
+            # Try Gemini first
+            answer_text = None
             try:
                 from app.ai.factory import get_ai_provider
                 provider = get_ai_provider(provider="gemini", api_key=settings.gemini_api_key)
                 request = AIRequest(question=question, context=context)
                 response = provider.generate(request)
-                self._show_answer(response.answer, search_results)
-            except Exception as gemini_err:
-                logger.warning("Gemini failed, trying auto-detect: %s", gemini_err)
+                answer_text = response.answer
+            except Exception as e:
+                logger.warning("Gemini failed: %s", e)
+
+            # Try OpenAI if Gemini failed
+            if not answer_text:
                 try:
                     from app.ai.factory import get_ai_provider
-                    provider = get_ai_provider(provider=None, api_key=None)
+                    provider = get_ai_provider(provider="openai", api_key=settings.openai_api_key)
                     request = AIRequest(question=question, context=context)
                     response = provider.generate(request)
-                    self._show_answer(response.answer, search_results)
-                except Exception as ai_err:
-                    logger.warning("AI provider failed: %s", ai_err)
-                # Fallback: show sources without AI
-                source_text = "AI is not available. Here are the most relevant sources:\n\n"
+                    answer_text = response.answer
+                except Exception as e:
+                    logger.warning("OpenAI failed: %s", e)
+
+            # Show answer or fallback
+            if answer_text:
+                self._show_answer(answer_text, search_results)
+            else:
+                source_text = "<b>AI mevcut degil.</b> En alakali kaynaklar:<br><br>"
                 for i, r in enumerate(search_results[:5], 1):
                     path = r.path
                     text = r.snippet[:200] if r.snippet else ""
@@ -176,16 +176,17 @@ class AskWidget(QWidget):
 
         except Exception as e:
             logger.error("Ask failed: %s", e)
-            self._show_answer(f"Error: {e}", [])
+            try:
+                self._show_answer(f"Hata: {e}", [])
+            except Exception:
+                pass
 
     def _show_answer(self, answer: str, sources: list):
-        # Clear old results
         while self.results_layout.count() > 1:
             item = self.results_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
-        # Format answer as HTML
         if not answer.startswith("<"):
             answer_html = f"<p>{answer.replace(chr(10), '<br>')}</p>"
         else:
