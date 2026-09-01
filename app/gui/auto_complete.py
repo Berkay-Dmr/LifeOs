@@ -99,19 +99,23 @@ class AutoCompleteLineEdit(QLineEdit):
         self._popup.suggestion_selected.connect(self._on_suggestion_selected)
         self._timer = QTimer()
         self._timer.setSingleShot(True)
-        self._timer.setInterval(600)
+        self._timer.setInterval(800)
         self._timer.timeout.connect(self._fetch_suggestions)
 
         self.textChanged.connect(self._on_text_changed)
         self._popup.list_widget.installEventFilter(self)
         self._user_is_selecting = False
+        self._rejected_for_query: str = ""
+        self._last_shown_query: str = ""
 
     def _on_text_changed(self, text: str):
         if self._user_is_selecting:
             return
-        # Immediately hide popup while user is typing
         self._popup.hide()
-        if len(text) >= 4:
+        # If user changed the query significantly, reset rejection
+        if self._rejected_for_query and not text.startswith(self._rejected_for_query):
+            self._rejected_for_query = ""
+        if len(text) >= 5:
             self._timer.start()
         else:
             self._timer.stop()
@@ -119,15 +123,28 @@ class AutoCompleteLineEdit(QLineEdit):
     def _fetch_suggestions(self):
         """Fetch suggestions based on current text."""
         text = self.text().strip()
-        if len(text) < 4:
+        if len(text) < 5:
             self._popup.hide()
+            return
+
+        # Don't show again for the same rejected query
+        if text == self._rejected_for_query:
+            return
+
+        # Don't show if already shown for this exact query
+        if text == self._last_shown_query:
             return
 
         suggestions = self._get_suggestions(text)
         if suggestions and len(suggestions) > 1:
+            self._last_shown_query = text
             self._popup.show_suggestions(suggestions, self)
         else:
             self._popup.hide()
+
+    def _on_popup_rejected(self):
+        """Mark current query as rejected."""
+        self._rejected_for_query = self.text().strip()
 
     def _get_suggestions(self, query: str) -> list[str]:
         """Get suggestions from search history and document names."""
@@ -232,6 +249,7 @@ class AutoCompleteLineEdit(QLineEdit):
                         self._on_suggestion_selected(current.text())
                         return True
                 elif event.key() == Qt.Key_Escape:
+                    self._on_popup_rejected()
                     self._popup.hide()
                     return True
                 elif event.key() == Qt.Key_Down:
@@ -245,7 +263,7 @@ class AutoCompleteLineEdit(QLineEdit):
                         self._popup.list_widget.setCurrentRow(row - 1)
                     return True
             elif event.type() == event.Type.FocusOut:
-                # Hide if focus moves away (with small delay for button clicks)
+                self._on_popup_rejected()
                 QTimer.singleShot(200, self._check_hide_popup)
         return super().eventFilter(obj, event)
 
@@ -255,5 +273,7 @@ class AutoCompleteLineEdit(QLineEdit):
             self._popup.hide()
 
     def focusOutEvent(self, event):
+        if self._popup.isVisible():
+            self._on_popup_rejected()
         super().focusOutEvent(event)
         QTimer.singleShot(200, self._check_hide_popup)
