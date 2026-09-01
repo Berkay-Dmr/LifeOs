@@ -963,6 +963,158 @@ def code_index(path: str | None):
     console.print(f"[green]Indexed {count} dependencies.[/green]")
 
 
+# ── todo ─────────────────────────────────────────────────────
+
+@cli.command(name="todo-extract")
+@click.argument("path", required=False)
+@click.option("--store", "-s", is_flag=True, help="Store in database")
+def todo_extract(path: str | None, store: bool):
+    """Extract TODOs from code files."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.ai.smart_systems import extract_todos_from_directory, extract_todos_from_file, store_todos
+
+    scan_path = path or str(settings.root_path)
+    if not scan_path:
+        console.print("[red]Path not set.[/red]")
+        return
+
+    console.print(f"[cyan]Extracting TODOs from:[/cyan] {scan_path}")
+
+    if path:
+        todos = extract_todos_from_file(scan_path)
+    else:
+        todos = extract_todos_from_directory(scan_path)
+
+    if not todos:
+        console.print("[dim]No TODOs found.[/dim]")
+        return
+
+    if store:
+        count = store_todos(todos)
+        console.print(f"[green]Stored {count} new tasks.[/green]")
+
+    table = Table(title="TODOs Found")
+    table.add_column("Priority", style="bold")
+    table.add_column("Task")
+    table.add_column("Source")
+
+    priority_colors = {"high": "red", "medium": "yellow", "low": "green"}
+
+    for todo in todos[:20]:
+        color = priority_colors.get(todo["priority"], "white")
+        source = todo.get("source", "-")
+        if source and len(source) > 30:
+            source = "..." + source[-27:]
+        table.add_row(
+            f"[{color}]{todo['priority']}",
+            todo["text"][:50],
+            source,
+        )
+
+    console.print(table)
+
+
+@cli.command(name="todo-list")
+def todo_list():
+    """List open tasks."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.ai.smart_systems import get_open_tasks
+
+    tasks = get_open_tasks()
+
+    if not tasks:
+        console.print("[dim]No open tasks.[/dim]")
+        return
+
+    table = Table(title="Open Tasks")
+    table.add_column("ID", style="cyan")
+    table.add_column("Priority")
+    table.add_column("Task")
+    table.add_column("Source")
+
+    priority_colors = {"high": "red", "medium": "yellow", "low": "green"}
+
+    for task in tasks:
+        color = priority_colors.get(task["priority"], "white")
+        source = task.get("source", "-")
+        if source and len(source) > 30:
+            source = "..." + source[-27:]
+        table.add_row(
+            task["id"],
+            f"[{color}]{task['priority']}",
+            task["text"][:50],
+            source,
+        )
+
+    console.print(table)
+
+
+# ── dedup ────────────────────────────────────────────────────
+
+@cli.command(name="memory-dedup")
+def memory_dedup():
+    """Check for duplicate memories."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.database.sqlite import get_connection
+    from app.ai.smart_systems import check_duplicate
+
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT id, content, type FROM memories WHERE active = 1 LIMIT 50"
+        ).fetchall()
+
+    duplicates = 0
+    for row in rows:
+        result = check_duplicate(row["content"], row["type"])
+        if result:
+            duplicates += 1
+            console.print(
+                f"\n[bold yellow]Duplicate found:[/bold yellow]\n"
+                f"  Existing: {result['existing_content'][:60]}\n"
+                f"  Similarity: {result['similarity']:.0%}\n"
+                f"  ID: {result['existing_id']}"
+            )
+
+    if duplicates == 0:
+        console.print("[green]No duplicates found.[/green]")
+    else:
+        console.print(f"\n[yellow]{duplicates} potential duplicate(s) found.[/yellow]")
+
+
+# ── contradict ───────────────────────────────────────────────
+
+@cli.command(name="decision-check")
+@click.argument("title")
+def decision_check(title: str):
+    """Check if a decision contradicts existing ones."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.ai.smart_systems import detect_contradiction
+
+    contradictions = detect_contradiction(title)
+
+    if not contradictions:
+        console.print("[green]No contradictions detected.[/green]")
+        return
+
+    console.print(f"[bold yellow]⚠ {len(contradictions)} potential contradiction(s):[/bold yellow]\n")
+
+    for c in contradictions:
+        console.print(
+            f"  [bold]Existing:[/bold] {c['existing_title']}\n"
+            f"  [bold]New:[/bold] {c['new_title']}\n"
+            f"  [bold]Type:[/bold] {c['type']}\n"
+            f"  [bold]Confidence:[/bold] {c['confidence']:.0%}\n"
+        )
+
+
 # ── bulk-delete ──────────────────────────────────────────
 
 @cli.command(name="bulk-delete")
