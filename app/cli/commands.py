@@ -1257,6 +1257,105 @@ def memory_consolidate():
     console.print(f"[green]Kept: {result['kept']} unique memories[/green]")
 
 
+# ── graph analysis ────────────────────────────────────────────────
+
+@cli.command(name="graph-centrality")
+@click.option("--top", default=10, help="Show top N nodes")
+def graph_centrality(top: int):
+    """Show most important nodes in the knowledge graph."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.graph.graph_builder import build_document_graph, get_centrality
+
+    G = build_document_graph()
+    centrality = get_centrality(G, top=top)
+
+    table = Table(title=f"Top {top} Central Nodes")
+    table.add_column("Node", style="bold")
+    table.add_column("Type")
+    table.add_column("Centrality", justify="right")
+    table.add_column("Connections", justify="right")
+
+    for node in centrality:
+        table.add_row(
+            node["label"][:40],
+            node["type"],
+            f"{node['centrality']:.3f}",
+            str(node["degree"]),
+        )
+
+    console.print(table)
+
+
+@cli.command(name="graph-communities")
+def graph_communities():
+    """Detect communities in the knowledge graph."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.graph.graph_builder import build_document_graph, find_communities
+
+    G = build_document_graph()
+    communities = find_communities(G)
+
+    console.print(f"[bold]Found {len(communities)} communities[/bold]\n")
+
+    for i, community in enumerate(communities[:5], 1):
+        docs = [G.nodes[n].get("label", n) for n in community
+                if G.nodes[n].get("node_type") == "document"][:5]
+        if docs:
+            console.print(f"[bold cyan]Community {i}:[/bold cyan]")
+            for doc in docs:
+                console.print(f"  - {doc}")
+            console.print()
+
+
+@cli.command(name="graph-path")
+@click.argument("source")
+@click.argument("target")
+def graph_path(source: str, target: str):
+    """Find path between two nodes."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.graph.graph_builder import build_document_graph, find_path
+
+    G = build_document_graph()
+
+    # Find nodes by label
+    source_id = None
+    target_id = None
+
+    for node_id, data in G.nodes(data=True):
+        label = data.get("label", "").lower()
+        if source.lower() in label and source_id is None:
+            source_id = node_id
+        if target.lower() in label and target_id is None:
+            target_id = node_id
+
+    if not source_id:
+        console.print(f"[red]Source '{source}' not found[/red]")
+        return
+    if not target_id:
+        console.print(f"[red]Target '{target}' not found[/red]")
+        return
+
+    path = find_path(G, source_id, target_id)
+
+    if not path:
+        console.print("[yellow]No path found[/yellow]")
+        return
+
+    console.print(f"[bold]Path ({len(path)} steps):[/bold]")
+    for i, node_id in enumerate(path):
+        label = G.nodes[node_id].get("label", node_id)
+        if i < len(path) - 1:
+            console.print(f"  {label} →")
+        else:
+            console.print(f"  {label}")
+
+
 # ── bulk-delete ──────────────────────────────────────────
 
 @cli.command(name="bulk-delete")

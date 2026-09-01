@@ -233,3 +233,104 @@ def get_graph_stats(G: nx.Graph) -> dict:
         "entities": sum(1 for _, d in G.nodes(data=True) if d.get("node_type") == "entity"),
         "connected_components": nx.number_connected_components(G),
     }
+
+
+def get_centrality(G: nx.Graph, top: int = 10) -> list[dict]:
+    """Get most central nodes (documents/entities)."""
+    if G.number_of_nodes() == 0:
+        return []
+
+    # Degree centrality
+    degree = nx.degree_centrality(G)
+
+    # Betweenness centrality
+    try:
+        betweenness = nx.betweenness_centrality(G)
+    except Exception:
+        betweenness = {n: 0 for n in G.nodes}
+
+    # Combine scores
+    combined = {}
+    for node in G.nodes:
+        combined[node] = 0.5 * degree.get(node, 0) + 0.5 * betweenness.get(node, 0)
+
+    # Sort and get top nodes
+    sorted_nodes = sorted(combined.items(), key=lambda x: x[1], reverse=True)[:top]
+
+    results = []
+    for node_id, score in sorted_nodes:
+        data = G.nodes[node_id]
+        results.append({
+            "id": node_id,
+            "label": data.get("label", node_id),
+            "type": data.get("node_type", "unknown"),
+            "centrality": score,
+            "degree": G.degree(node_id),
+        })
+
+    return results
+
+
+def find_communities(G: nx.Graph) -> list[set]:
+    """Detect communities in the graph."""
+    if G.number_of_nodes() == 0:
+        return []
+
+    try:
+        from networkx.algorithms.community import greedy_modularity_communities
+        communities = list(greedy_modularity_communities(G))
+        return communities
+    except Exception:
+        return []
+
+
+def find_path(G: nx.Graph, source: str, target: str) -> list | None:
+    """Find shortest path between two nodes."""
+    try:
+        return nx.shortest_path(G, source, target)
+    except (nx.NetworkXNoPath, nx.NodeNotFound):
+        return None
+
+
+def get_related_documents(G: nx.Graph, doc_id: str, limit: int = 5) -> list[dict]:
+    """Get documents related to a given document."""
+    if doc_id not in G.nodes:
+        return []
+
+    # Get neighbors
+    neighbors = list(G.neighbors(doc_id))
+
+    # Sort by edge weight
+    results = []
+    for neighbor in neighbors:
+        if G.nodes[neighbor].get("node_type") != "document":
+            continue
+
+        edge_data = G.edges[doc_id, neighbor]
+        results.append({
+            "id": neighbor,
+            "label": G.nodes[neighbor].get("label", neighbor),
+            "weight": edge_data.get("weight", 0),
+        })
+
+    results.sort(key=lambda x: x["weight"], reverse=True)
+    return results[:limit]
+
+
+def get_entity_connections(G: nx.Graph, entity: str) -> list[dict]:
+    """Get all documents connected to an entity."""
+    node_id = f"entity_{entity}"
+    if node_id not in G.nodes:
+        return []
+
+    results = []
+    for neighbor in G.neighbors(node_id):
+        if G.nodes[neighbor].get("node_type") == "document":
+            edge_data = G.edges[node_id, neighbor]
+            results.append({
+                "id": neighbor,
+                "label": G.nodes[neighbor].get("label", neighbor),
+                "weight": edge_data.get("weight", 0),
+            })
+
+    return results
