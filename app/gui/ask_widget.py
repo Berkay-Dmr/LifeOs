@@ -5,8 +5,7 @@ from PySide6.QtWidgets import (
     QLabel, QFrame, QPushButton, QScrollArea, QSizePolicy,
     QTextBrowser,
 )
-from PySide6.QtCore import Qt, Signal, QTimer
-from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt, Signal, QTimer, QThread
 
 import logging
 
@@ -25,7 +24,6 @@ class AnswerCard(QFrame):
         layout.setSpacing(12)
         layout.setContentsMargins(20, 16, 20, 16)
 
-        # Answer header
         header = QLabel("AI Answer")
         header.setObjectName("titleLabel")
         font = header.font()
@@ -33,7 +31,6 @@ class AnswerCard(QFrame):
         header.setFont(font)
         layout.addWidget(header)
 
-        # Answer text
         answer_browser = QTextBrowser()
         answer_browser.setOpenExternalLinks(True)
         answer_browser.setHtml(answer)
@@ -41,7 +38,6 @@ class AnswerCard(QFrame):
         answer_browser.setMaximumHeight(400)
         layout.addWidget(answer_browser)
 
-        # Sources
         if sources:
             sources_label = QLabel("Kaynaklar:")
             sources_label.setStyleSheet("font-weight: bold; color: #7aa2f7; margin-top: 8px;")
@@ -60,11 +56,79 @@ class AnswerCard(QFrame):
                 layout.addWidget(src_label)
 
 
+class AskWorker(QThread):
+    """Background thread for AI ask operation."""
+    finished = Signal(str, list)  # answer, sources
+    error = Signal(str)  # error message
+
+    def __init__(self, question: str):
+        super().__init__()
+        self.question = question
+
+    def run(self):
+        try:
+            from app.config.settings import get_settings
+            from app.database.sqlite import init_db
+            from app.search.hybrid import hybrid_search
+            from app.ai.context_builder import build_context
+            from app.models.search import SearchQuery
+            from app.ai.base import AIRequest
+
+            settings = get_settings()
+            init_db(settings.db_path)
+
+            sq = SearchQuery(text=self.question, top_k=8)
+            search_results = hybrid_search(sq, settings)
+
+            if not search_results:
+                self.finished.emit("No relevant information found in your knowledge base.", [])
+                return
+
+            context = build_context(search_results)
+
+            # Try Gemini first
+            answer_text = None
+            try:
+                from app.ai.factory import get_ai_provider
+                provider = get_ai_provider(provider="gemini", api_key=settings.gemini_api_key)
+                request = AIRequest(question=self.question, context=context)
+                response = provider.generate(request)
+                answer_text = response.answer
+            except Exception as e:
+                logger.warning("Gemini failed: %s", e)
+
+            # Try OpenAI if Gemini failed
+            if not answer_text:
+                try:
+                    from app.ai.factory import get_ai_provider
+                    provider = get_ai_provider(provider="openai", api_key=settings.openai_api_key)
+                    request = AIRequest(question=self.question, context=context)
+                    response = provider.generate(request)
+                    answer_text = response.answer
+                except Exception as e:
+                    logger.warning("OpenAI failed: %s", e)
+
+            if answer_text:
+                self.finished.emit(answer_text, search_results)
+            else:
+                source_text = "<b>AI mevcut degil.</b> En alakali kaynaklar:<br><br>"
+                for i, r in enumerate(search_results[:5], 1):
+                    path = r.path
+                    text = r.snippet[:200] if r.snippet else ""
+                    source_text += f"<b>[{i}] {path}</b><br>{text}<br><br>"
+                self.finished.emit(source_text, search_results)
+
+        except Exception as e:
+            logger.error("Ask failed: %s", e)
+            self.error.emit(str(e))
+
+
 class AskWidget(QWidget):
     """Ask AI page widget."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._worker = None
         self._init_ui()
 
     def _init_ui(self):
@@ -89,10 +153,10 @@ class AskWidget(QWidget):
         self.ask_input.returnPressed.connect(self._on_ask)
         ask_layout.addWidget(self.ask_input)
 
-        ask_btn = QPushButton("Ask")
-        ask_btn.setObjectName("primaryBtn")
-        ask_btn.clicked.connect(self._on_ask)
-        ask_layout.addWidget(ask_btn)
+        self.ask_btn = QPushButton("Ask")
+        self.ask_btn.setObjectName("primaryBtn")
+        self.ask_btn.clicked.connect(self._on_ask)
+        ask_layout.addWidget(self.ask_btn)
 
         layout.addLayout(ask_layout)
 
@@ -117,69 +181,23 @@ class AskWidget(QWidget):
         question = self.ask_input.text().strip()
         if not question:
             return
-        self.status_label.setText("Thinking...")
-        QTimer.singleShot(10, lambda: self._do_ask(question))
+        if self._worker and self._worker.isRunning():
+            return
 
-    def _do_ask(self, question: str):
-        try:
-            from app.config.settings import get_settings
-            from app.database.sqlite import init_db
-            from app.search.hybrid import hybrid_search
-            from app.ai.context_builder import build_context
-            from app.models.search import SearchQuery
-            from app.ai.base import AIRequest
+        self.ask_btn.setEnabled(False)
+        self.status_label.setText("Dusunuyor...")
+        self._worker = AskWorker(question)
+        self._worker.finished.connect(self._on_answer)
+        self._worker.error.connect(self._on_error)
+        self._worker.start()
 
-            settings = get_settings()
-            init_db(settings.db_path)
+    def _on_answer(self, answer: str, sources: list):
+        self.ask_btn.setEnabled(True)
+        self._show_answer(answer, sources)
 
-            sq = SearchQuery(text=question, top_k=8)
-            search_results = hybrid_search(sq, settings)
-
-            if not search_results:
-                self._show_answer("No relevant information found in your knowledge base.", [])
-                return
-
-            context = build_context(search_results)
-
-            # Try Gemini first
-            answer_text = None
-            try:
-                from app.ai.factory import get_ai_provider
-                provider = get_ai_provider(provider="gemini", api_key=settings.gemini_api_key)
-                request = AIRequest(question=question, context=context)
-                response = provider.generate(request)
-                answer_text = response.answer
-            except Exception as e:
-                logger.warning("Gemini failed: %s", e)
-
-            # Try OpenAI if Gemini failed
-            if not answer_text:
-                try:
-                    from app.ai.factory import get_ai_provider
-                    provider = get_ai_provider(provider="openai", api_key=settings.openai_api_key)
-                    request = AIRequest(question=question, context=context)
-                    response = provider.generate(request)
-                    answer_text = response.answer
-                except Exception as e:
-                    logger.warning("OpenAI failed: %s", e)
-
-            # Show answer or fallback
-            if answer_text:
-                self._show_answer(answer_text, search_results)
-            else:
-                source_text = "<b>AI mevcut degil.</b> En alakali kaynaklar:<br><br>"
-                for i, r in enumerate(search_results[:5], 1):
-                    path = r.path
-                    text = r.snippet[:200] if r.snippet else ""
-                    source_text += f"<b>[{i}] {path}</b><br>{text}<br><br>"
-                self._show_answer(source_text, search_results)
-
-        except Exception as e:
-            logger.error("Ask failed: %s", e)
-            try:
-                self._show_answer(f"Hata: {e}", [])
-            except Exception:
-                pass
+    def _on_error(self, error: str):
+        self.ask_btn.setEnabled(True)
+        self._show_answer(f"Hata: {error}", [])
 
     def _show_answer(self, answer: str, sources: list):
         while self.results_layout.count() > 1:

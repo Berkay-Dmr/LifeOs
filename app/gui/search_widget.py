@@ -4,8 +4,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
     QLabel, QFrame, QPushButton, QScrollArea, QSizePolicy,
 )
-from PySide6.QtCore import Qt, Signal, QTimer
-from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt, Signal, QTimer, QThread
 
 import logging
 
@@ -24,7 +23,6 @@ class ResultCard(QFrame):
         layout.setSpacing(6)
         layout.setContentsMargins(16, 12, 16, 12)
 
-        # Header row
         header = QHBoxLayout()
         header.setSpacing(12)
 
@@ -40,7 +38,6 @@ class ResultCard(QFrame):
         header.addStretch()
         layout.addLayout(header)
 
-        # Title
         title_lbl = QLabel(title)
         title_lbl.setWordWrap(True)
         font = title_lbl.font()
@@ -49,12 +46,39 @@ class ResultCard(QFrame):
         title_lbl.setFont(font)
         layout.addWidget(title_lbl)
 
-        # Snippet
         if snippet:
             snippet_lbl = QLabel(snippet[:300])
             snippet_lbl.setWordWrap(True)
             snippet_lbl.setStyleSheet("color: #787c99; font-size: 12px;")
             layout.addWidget(snippet_lbl)
+
+
+class SearchWorker(QThread):
+    """Background thread for search operation."""
+    finished = Signal(list)  # results
+    error = Signal(str)  # error message
+
+    def __init__(self, query: str):
+        super().__init__()
+        self.query = query
+
+    def run(self):
+        try:
+            from app.config.settings import get_settings
+            from app.database.sqlite import init_db
+            from app.search.hybrid import hybrid_search
+            from app.models.search import SearchQuery
+
+            settings = get_settings()
+            init_db(settings.db_path)
+
+            sq = SearchQuery(text=self.query, top_k=15)
+            results = hybrid_search(sq, settings)
+            self.finished.emit(results)
+
+        except Exception as e:
+            logger.error("Search failed: %s", e)
+            self.error.emit(str(e))
 
 
 class SearchWidget(QWidget):
@@ -65,6 +89,7 @@ class SearchWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._results: list = []
+        self._worker = None
         self._init_ui()
 
     def _init_ui(self):
@@ -72,7 +97,6 @@ class SearchWidget(QWidget):
         layout.setContentsMargins(32, 24, 32, 24)
         layout.setSpacing(16)
 
-        # Title
         title = QLabel("Search")
         title.setObjectName("titleLabel")
         layout.addWidget(title)
@@ -81,7 +105,6 @@ class SearchWidget(QWidget):
         subtitle.setObjectName("subtitleLabel")
         layout.addWidget(subtitle)
 
-        # Search bar
         search_layout = QHBoxLayout()
         search_layout.setSpacing(8)
 
@@ -91,19 +114,17 @@ class SearchWidget(QWidget):
         self.search_input.returnPressed.connect(self._on_search)
         search_layout.addWidget(self.search_input)
 
-        search_btn = QPushButton("Search")
-        search_btn.setObjectName("primaryBtn")
-        search_btn.clicked.connect(self._on_search)
-        search_layout.addWidget(search_btn)
+        self.search_btn = QPushButton("Search")
+        self.search_btn.setObjectName("primaryBtn")
+        self.search_btn.clicked.connect(self._on_search)
+        search_layout.addWidget(self.search_btn)
 
         layout.addLayout(search_layout)
 
-        # Results count
         self.count_label = QLabel("")
         self.count_label.setObjectName("subtitleLabel")
         layout.addWidget(self.count_label)
 
-        # Results area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -121,40 +142,34 @@ class SearchWidget(QWidget):
         query = self.search_input.text().strip()
         if not query:
             return
+        if self._worker and self._worker.isRunning():
+            return
 
-        self.count_label.setText("Searching...")
-        QTimer.singleShot(10, lambda: self._do_search(query))
+        self.search_btn.setEnabled(False)
+        self.count_label.setText("Araniyor...")
+        self._worker = SearchWorker(query)
+        self._worker.finished.connect(self._on_results)
+        self._worker.error.connect(self._on_error)
+        self._worker.start()
 
-    def _do_search(self, query: str):
-        try:
-            from app.config.settings import get_settings
-            from app.database.sqlite import init_db
-            from app.search.hybrid import hybrid_search
-            from app.models.search import SearchQuery
+    def _on_results(self, results: list):
+        self.search_btn.setEnabled(True)
+        self._show_results(results)
 
-            settings = get_settings()
-            init_db(settings.db_path)
-
-            sq = SearchQuery(text=query, top_k=15)
-            results = hybrid_search(sq, settings)
-            self._show_results(results)
-
-        except Exception as e:
-            logger.error("Search failed: %s", e)
-            self.count_label.setText(f"Search failed: {e}")
+    def _on_error(self, error: str):
+        self.search_btn.setEnabled(True)
+        self.count_label.setText(f"Hata: {error}")
 
     def _show_results(self, results: list):
-        # Clear old results
         while self.results_layout.count() > 1:
             item = self.results_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
         self._results = results
-        self.count_label.setText(f"{len(results)} results found")
+        self.count_label.setText(f"{len(results)} sonuc bulundu")
 
         for r in results:
-            # Support both SearchResult dataclass and dict
             if hasattr(r, "path"):
                 path = r.path
                 text = r.snippet or ""
