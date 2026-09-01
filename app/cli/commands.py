@@ -603,7 +603,7 @@ def git(max_count: int) -> None:
 
 @cli.command(name="git-index")
 @click.option("--max-commits", "-n", default=50, help="Max commits to index")
-def git_index(max_commits: int) -> None:
+def git_index(max_commits: int):
     """Index git commit history for search."""
     settings = _ensure_config()
     _init_database(settings)
@@ -618,6 +618,245 @@ def git_index(max_commits: int) -> None:
     console.print("[cyan]Indexing git history...[/cyan]")
     count = index_git_history(root, max_commits=max_commits)
     console.print(f"[green]Indexed {count} commits.[/green]")
+
+
+# ── projects ──────────────────────────────────────────────────
+
+@cli.command()
+def projects():
+    """List all projects."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.projects.manager import list_projects
+
+    all_projects = list_projects()
+    if not all_projects:
+        console.print("[dim]No projects found.[/dim]")
+        console.print("Run: lifeos project-discover")
+        return
+
+    table = Table(title="Projects")
+    table.add_column("Name", style="bold")
+    table.add_column("Language")
+    table.add_column("Framework")
+    table.add_column("Status")
+    table.add_column("Path")
+
+    for p in all_projects:
+        table.add_row(
+            p.name,
+            p.language or "-",
+            p.framework or "-",
+            p.status,
+            p.path[:40],
+        )
+
+    console.print(table)
+
+
+@cli.command(name="project-discover")
+@click.option("--path", "-p", type=str, help="Path to scan for projects")
+def project_discover(path: str | None):
+    """Auto-discover projects in a directory."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    scan_path = Path(path) if path else settings.root_path
+    if not scan_path or not scan_path.exists():
+        console.print(f"[red]Path not found:[/red] {scan_path}")
+        return
+
+    console.print(f"[cyan]Scanning for projects in:[/cyan] {scan_path}\n")
+
+    from app.projects.manager import discover_projects
+
+    discovered = discover_projects(scan_path)
+
+    if not discovered:
+        console.print("[dim]No projects found.[/dim]")
+        return
+
+    table = Table(title="Discovered Projects")
+    table.add_column("Name", style="bold green")
+    table.add_column("Language")
+    table.add_column("Framework")
+    table.add_column("Path")
+
+    for p in discovered:
+        table.add_row(
+            p.name,
+            p.language or "-",
+            p.framework or "-",
+            p.path[:50],
+        )
+
+    console.print(table)
+    console.print(f"\n[green]{len(discovered)} project(s) found.[/green]")
+
+
+@cli.command(name="project-add")
+@click.argument("name")
+@click.option("--path", "-p", required=True, help="Project path")
+@click.option("--language", "-l", help="Programming language")
+@click.option("--framework", "-f", help="Framework")
+def project_add(name: str, path: str, language: str | None, framework: str | None):
+    """Manually add a project."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.projects.manager import create_project
+
+    project = create_project(
+        name=name,
+        path=path,
+        language=language,
+        framework=framework,
+    )
+
+    console.print(f"[green]Project created:[/green] {project.name} ({project.id})")
+
+
+# ── decisions ─────────────────────────────────────────────────
+
+@cli.command()
+@click.argument("title")
+@click.option("--reason", "-r", help="Reason for the decision")
+@click.option("--project", "-p", help="Project ID")
+@click.option("--alternatives", "-a", help="Alternatives (comma-separated)")
+def decision_add(title: str, reason: str | None, project: str | None, alternatives: str | None):
+    """Add a decision record."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.projects.manager import create_decision
+
+    alt_list = [a.strip() for a in alternatives.split(",")] if alternatives else []
+
+    dec = create_decision(
+        title=title,
+        reason=reason,
+        alternatives=alt_list,
+        project_id=project,
+    )
+
+    console.print(f"[green]Decision recorded:[/green] {dec.title} ({dec.id})")
+
+
+@cli.command(name="decision-list")
+@click.option("--project", "-p", help="Filter by project")
+def decision_list(project: str | None):
+    """List decisions."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.database.sqlite import get_connection
+
+    with get_connection() as conn:
+        if project:
+            rows = conn.execute(
+                "SELECT * FROM decisions WHERE project_id = ? ORDER BY date DESC",
+                (project,)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM decisions ORDER BY date DESC LIMIT 20"
+            ).fetchall()
+
+    if not rows:
+        console.print("[dim]No decisions found.[/dim]")
+        return
+
+    table = Table(title="Decisions")
+    table.add_column("Title", style="bold")
+    table.add_column("Date")
+    table.add_column("Status")
+    table.add_column("Reason")
+
+    for r in rows:
+        status_color = "green" if r["status"] == "active" else "yellow"
+        table.add_row(
+            r["title"][:50],
+            r["date"],
+            f"[{status_color}]{r['status']}",
+            (r["reason"] or "-")[:40],
+        )
+
+    console.print(table)
+
+
+# ── bugs ──────────────────────────────────────────────────────
+
+@cli.command()
+@click.argument("title")
+@click.option("--error", "-e", help="Error message")
+@click.option("--project", "-p", help="Project ID")
+@click.option("--cause", "-c", help="Root cause")
+@click.option("--solution", "-s", help="Solution")
+def bug_add(title: str, error: str | None, project: str | None, cause: str | None, solution: str | None):
+    """Add a bug record."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.projects.manager import create_bug
+
+    bug = create_bug(
+        title=title,
+        error_message=error,
+        project_id=project,
+        cause=cause,
+        solution=solution,
+    )
+
+    console.print(f"[green]Bug recorded:[/green] {bug.title} ({bug.id})")
+
+
+@cli.command(name="bug-list")
+@click.option("--project", "-p", help="Filter by project")
+@click.option("--resolved", "-r", is_flag=True, help="Show only resolved bugs")
+def bug_list(project: str | None, resolved: bool):
+    """List bugs."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.database.sqlite import get_connection
+
+    with get_connection() as conn:
+        query = "SELECT * FROM bugs WHERE 1=1"
+        params = []
+
+        if project:
+            query += " AND project_id = ?"
+            params.append(project)
+
+        if resolved:
+            query += " AND resolved = 1"
+        else:
+            query += " AND resolved = 0"
+
+        query += " ORDER BY first_seen DESC LIMIT 20"
+        rows = conn.execute(query, params).fetchall()
+
+    if not rows:
+        console.print("[dim]No bugs found.[/dim]")
+        return
+
+    table = Table(title="Bugs")
+    table.add_column("Title", style="bold")
+    table.add_column("Error")
+    table.add_column("Status")
+    table.add_column("First Seen")
+
+    for r in rows:
+        status = "[green]Resolved" if r["resolved"] else "[red]Open"
+        table.add_row(
+            r["title"][:40],
+            (r["error_message"] or "-")[:30],
+            status,
+            r["first_seen"][:10],
+        )
+
+    console.print(table)
 
 
 # ── bulk-delete ──────────────────────────────────────────

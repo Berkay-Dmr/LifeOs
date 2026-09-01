@@ -114,11 +114,12 @@ class MainWindow(QMainWindow):
         pages = [
             ("Search", "🔍", 0),
             ("Ask AI", "💬", 1),
-            ("Memories", "🧠", 2),
-            ("Timeline", "📅", 3),
-            ("Graph", "🕸️", 4),
-            ("Bulk", "📦", 5),
-            ("Settings", "⚙️", 6),
+            ("Projects", "📁", 2),
+            ("Memories", "🧠", 3),
+            ("Timeline", "📅", 4),
+            ("Graph", "🕸️", 5),
+            ("Bulk", "📦", 6),
+            ("Settings", "⚙️", 7),
         ]
 
         for text, icon, index in pages:
@@ -151,17 +152,19 @@ class MainWindow(QMainWindow):
         self.memory_widget = MemoryWidget()
         self.timeline_widget = TimelineWidget()
 
+        self._projects_widget = None
         self._graph_widget = None
         self._bulk_widget = None
         self._settings_widget = None
 
         self.stack.addWidget(self.search_widget)
         self.stack.addWidget(self.ask_widget)
+        self.stack.addWidget(QWidget())  # Projects placeholder
         self.stack.addWidget(self.memory_widget)
         self.stack.addWidget(self.timeline_widget)
-        self.stack.addWidget(QWidget())
-        self.stack.addWidget(QWidget())
-        self.stack.addWidget(QWidget())
+        self.stack.addWidget(QWidget())  # Graph placeholder
+        self.stack.addWidget(QWidget())  # Bulk placeholder
+        self.stack.addWidget(QWidget())  # Settings placeholder
 
         main_layout.addWidget(self.stack)
 
@@ -180,28 +183,37 @@ class MainWindow(QMainWindow):
 
     def _switch_page(self, index: int):
         # Lazy load widgets
-        if index == 4 and self._graph_widget is None:
+        if index == 2 and self._projects_widget is None:
+            try:
+                from app.gui.projects_widget import ProjectsWidget
+                self._projects_widget = ProjectsWidget()
+                self.stack.removeWidget(self.stack.widget(2))
+                self.stack.insertWidget(2, self._projects_widget)
+            except Exception as e:
+                print(f"Failed to load projects widget: {e}")
+
+        if index == 5 and self._graph_widget is None:
             try:
                 from app.graph.graph_widget import GraphWidget
                 self._graph_widget = GraphWidget()
-                self.stack.removeWidget(self.stack.widget(4))
-                self.stack.insertWidget(4, self._graph_widget)
+                self.stack.removeWidget(self.stack.widget(5))
+                self.stack.insertWidget(5, self._graph_widget)
             except Exception as e:
                 print(f"Failed to load graph widget: {e}")
 
-        if index == 5 and self._bulk_widget is None:
+        if index == 6 and self._bulk_widget is None:
             try:
                 from app.gui.bulk_widget import BulkOperationsWidget
                 self._bulk_widget = BulkOperationsWidget()
-                self.stack.removeWidget(self.stack.widget(5))
-                self.stack.insertWidget(5, self._bulk_widget)
+                self.stack.removeWidget(self.stack.widget(6))
+                self.stack.insertWidget(6, self._bulk_widget)
             except Exception as e:
                 print(f"Failed to load bulk widget: {e}")
 
-        if index == 6 and self._settings_widget is None:
+        if index == 7 and self._settings_widget is None:
             self._settings_widget = SettingsWidget()
-            self.stack.removeWidget(self.stack.widget(6))
-            self.stack.insertWidget(6, self._settings_widget)
+            self.stack.removeWidget(self.stack.widget(7))
+            self.stack.insertWidget(7, self._settings_widget)
 
         self.stack.setCurrentIndex(index)
 
