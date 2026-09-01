@@ -3,12 +3,13 @@ from __future__ import annotations
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QStackedWidget, QStatusBar,
-    QSizePolicy, QFrame, QGraphicsDropShadowEffect,
+    QSizePolicy, QFrame,
 )
-from PySide6.QtCore import Qt, QSize, QPropertyAnimation, QEasingCurve
-from PySide6.QtGui import QFont, QIcon, QLinearGradient, QColor
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QFont, QIcon
 
-from app.gui.styles import DARK_THEME
+from app.gui.styles import DARK_THEME, LIGHT_THEME
+from app.gui.theme import theme_manager
 from app.gui.search_widget import SearchWidget
 from app.gui.ask_widget import AskWidget
 from app.gui.memory_widget import MemoryWidget
@@ -36,13 +37,27 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(900, 600)
         self.resize(1200, 750)
 
-        # Apply dark theme
-        self.setStyleSheet(DARK_THEME)
+        # Apply initial theme
+        self._apply_theme(theme_manager.current)
 
         # Initialize notification manager
         notifications.set_parent(self)
 
         self._init_ui()
+
+        # Listen for theme changes
+        theme_manager.on_change(self._on_theme_change)
+
+    def _apply_theme(self, theme: str):
+        """Apply the given theme."""
+        if theme == "dark":
+            self.setStyleSheet(DARK_THEME)
+        else:
+            self.setStyleSheet(LIGHT_THEME)
+
+    def _on_theme_change(self, theme: str):
+        """Handle theme change."""
+        self._apply_theme(theme)
 
     def _init_ui(self):
         central = QWidget()
@@ -59,14 +74,13 @@ class MainWindow(QMainWindow):
         sidebar_layout.setContentsMargins(12, 20, 12, 20)
         sidebar_layout.setSpacing(4)
 
-        # Logo with glow effect
+        # Logo
         logo_frame = QFrame()
         logo_frame.setStyleSheet("""
             QFrame {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 rgba(122,162,247,0.2), stop:1 rgba(187,154,247,0.1));
-                border-radius: 16px;
-                padding: 12px;
+                background: rgba(56,139,253,0.12);
+                border-radius: 14px;
+                padding: 10px;
             }
         """)
         logo_inner = QVBoxLayout(logo_frame)
@@ -76,7 +90,7 @@ class MainWindow(QMainWindow):
         logo.setStyleSheet("""
             font-size: 20px;
             font-weight: bold;
-            color: #7aa2f7;
+            color: #58a6ff;
             background: transparent;
         """)
         logo.setAlignment(Qt.AlignCenter)
@@ -85,16 +99,16 @@ class MainWindow(QMainWindow):
         subtitle = QLabel("Second Brain")
         subtitle.setStyleSheet("""
             font-size: 11px;
-            color: #bb9af7;
+            color: #a371f7;
             background: transparent;
         """)
         subtitle.setAlignment(Qt.AlignCenter)
         logo_inner.addWidget(subtitle)
 
         sidebar_layout.addWidget(logo_frame)
-        sidebar_layout.addSpacing(16)
+        sidebar_layout.addSpacing(12)
 
-        # Nav buttons with icons
+        # Nav buttons
         self._nav_buttons: list[QPushButton] = []
 
         pages = [
@@ -115,24 +129,17 @@ class MainWindow(QMainWindow):
 
         sidebar_layout.addStretch()
 
-        # Version badge
-        version_frame = QFrame()
-        version_frame.setStyleSheet("""
-            QFrame {
-                background: rgba(122,162,247,0.1);
-                border-radius: 8px;
-                padding: 4px;
-            }
-        """)
-        version_layout = QVBoxLayout(version_frame)
-        version_layout.setContentsMargins(0, 4, 0, 4)
+        # Theme toggle button
+        self.theme_btn = SidebarButton("🌙 Dark", "")
+        self.theme_btn.setCursor(Qt.PointingHandCursor)
+        self.theme_btn.clicked.connect(self._toggle_theme)
+        sidebar_layout.addWidget(self.theme_btn)
 
-        version = QLabel("v0.2.0")
-        version.setStyleSheet("color: #7aa2f7; font-size: 11px; background: transparent;")
+        # Version
+        version = QLabel("v0.3.0")
+        version.setObjectName("subtitleLabel")
         version.setAlignment(Qt.AlignCenter)
-        version_layout.addWidget(version)
-
-        sidebar_layout.addWidget(version_frame)
+        sidebar_layout.addWidget(version)
 
         main_layout.addWidget(sidebar)
 
@@ -144,7 +151,6 @@ class MainWindow(QMainWindow):
         self.memory_widget = MemoryWidget()
         self.timeline_widget = TimelineWidget()
 
-        # Lazy load placeholders
         self._graph_widget = None
         self._bulk_widget = None
         self._settings_widget = None
@@ -153,17 +159,24 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.ask_widget)
         self.stack.addWidget(self.memory_widget)
         self.stack.addWidget(self.timeline_widget)
-        self.stack.addWidget(QWidget())  # Graph placeholder
-        self.stack.addWidget(QWidget())  # Bulk placeholder
-        self.stack.addWidget(QWidget())  # Settings placeholder
+        self.stack.addWidget(QWidget())
+        self.stack.addWidget(QWidget())
+        self.stack.addWidget(QWidget())
 
         main_layout.addWidget(self.stack)
 
-        # ── Status Bar ─────────────────────────────────────────────────────
+        # Status bar
         self.statusBar().showMessage("Ready")
 
         # Default page
         self._switch_page(0)
+
+    def _toggle_theme(self):
+        """Toggle between dark and light theme."""
+        theme_manager.toggle()
+        is_dark = theme_manager.is_dark
+        self.theme_btn.setText("🌙 Dark" if is_dark else "☀️ Light")
+        notifications.info(f"Theme changed to {'Dark' if is_dark else 'Light'}")
 
     def _switch_page(self, index: int):
         # Lazy load widgets
