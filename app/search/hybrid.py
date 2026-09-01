@@ -8,6 +8,39 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Query expansion synonyms
+SYNONYM_MAP: dict[str, list[str]] = {
+    "numara": ["no", "numara", "numarası", "numaram"],
+    "öğrenci": ["öğrenci", "ogrenci", "öğrenci"],
+    "belge": ["belge", "belgesi", "doküman"],
+    "üniversite": ["üniversite", "niversite", "yükseköğretim"],
+    "fakülte": ["fakülte", "fakulte"],
+    "borç": ["borç", "alacak", "prim"],
+    "sicil": ["sicil", "kayıt", "adli"],
+    "mezun": ["mezun", "bitirme", "diploma"],
+    "barınma": ["barınma", "yurt", "konaklama"],
+    "burs": ["burs", "kredi", " KYK"],
+}
+
+
+def expand_query(text: str) -> list[str]:
+    """Expand query with synonyms for better recall."""
+    words = text.lower().split()
+    expanded = [text]  # Original query first
+
+    for word in words:
+        for key, synonyms in SYNONYM_MAP.items():
+            if word in synonyms or any(s in word for s in synonyms):
+                # Add synonym-expanded version
+                for syn in synonyms:
+                    if syn != word:
+                        expanded_text = text.lower().replace(word, syn)
+                        if expanded_text not in expanded:
+                            expanded.append(expanded_text)
+                break
+
+    return expanded[:5]  # Limit expansions
+
 
 def hybrid_search(query: SearchQuery, settings: LifeOSSettings) -> list[SearchResult]:
     """Hybrid search: semantic + keyword + ranking."""
@@ -31,19 +64,22 @@ def hybrid_search(query: SearchQuery, settings: LifeOSSettings) -> list[SearchRe
         path_lower = doc_path.lower()
         return any(path_lower.endswith(ext) for ext in filter_exts)
 
-    # 1. Semantic search (if FAISS available)
+    # 1. Semantic search with query expansion
     try:
         from app.search.semantic import semantic_search
-        semantic_results = semantic_search(
-            query.text, top_k=query.top_k * 2, settings=settings
-        )
-        for r in semantic_results:
-            if not _matches_filter(r.path):
-                continue
-            key = f"{r.document_id}:{r.chunk_id}"
-            if key not in seen:
-                seen.add(key)
-                results.append(r)
+        expanded_queries = expand_query(query.text)
+
+        for expanded in expanded_queries:
+            semantic_results = semantic_search(
+                expanded, top_k=query.top_k, settings=settings
+            )
+            for r in semantic_results:
+                if not _matches_filter(r.path):
+                    continue
+                key = f"{r.document_id}:{r.chunk_id}"
+                if key not in seen:
+                    seen.add(key)
+                    results.append(r)
     except Exception as e:
         logger.debug("Semantic search unavailable: %s", e)
 
