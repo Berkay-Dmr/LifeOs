@@ -28,3 +28,6 @@ watchdog>=4.0
 
 # GUI (optional)
 PySide6>=6.5
+
+# Testing
+pytest>=8.0
