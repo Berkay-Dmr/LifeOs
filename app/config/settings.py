@@ -31,6 +31,9 @@ class LifeOSSettings:
         self.recency_weight: float = float(os.getenv("LIFEOS_RECENCY_WEIGHT", "0.10"))
         self.metadata_weight: float = float(os.getenv("LIFEOS_METADATA_WEIGHT", "0.10"))
 
+        # Embedding
+        self.embedding_model: str = os.getenv("LIFEOS_EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
+
         # AI - read from env directly (no prefix for API keys)
         self.ai_provider: str = os.getenv("LIFEOS_AI_PROVIDER", "auto")
         self.openai_api_key: str = os.getenv("OPENAI_API_KEY", "")

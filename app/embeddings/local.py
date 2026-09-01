@@ -14,8 +14,26 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Default model
-DEFAULT_MODEL = "all-MiniLM-L6-v2"
+# Models: name -> (dimension, description)
+EMBEDDING_MODELS = {
+    # Multilingual (supports Turkish)
+    "paraphrase-multilingual-MiniLM-L12-v2": {
+        "dim": 384,
+        "desc": "Multilingual, good for Turkish (recommended)",
+    },
+    # English-optimized (better quality for English)
+    "all-mpnet-base-v2": {
+        "dim": 768,
+        "desc": "Best quality English model",
+    },
+    # Fast & lightweight
+    "all-MiniLM-L6-v2": {
+        "dim": 384,
+        "desc": "Fast, lightweight, English-focused",
+    },
+}
+
+DEFAULT_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
 
 
 class LocalEmbedding:
@@ -23,7 +41,7 @@ class LocalEmbedding:
 
     def __init__(self, model_name: str | None = None):
         settings = get_settings()
-        self._model_name = model_name or DEFAULT_MODEL
+        self._model_name = model_name or getattr(settings, "embedding_model", DEFAULT_MODEL) or DEFAULT_MODEL
         self._model = None
         self._dimension: int | None = None
         self._cache_dir = settings.data_path / "embedding_cache"
@@ -36,10 +54,7 @@ class LocalEmbedding:
             from sentence_transformers import SentenceTransformer
             logger.info("Loading embedding model: %s", self._model_name)
             self._model = SentenceTransformer(self._model_name)
-            try:
-                self._dimension = self._model.get_embedding_dimension()
-            except AttributeError:
-                self._dimension = self._model.get_sentence_embedding_dimension()
+            self._dimension = EMBEDDING_MODELS.get(self._model_name, {}).get("dim", 384)
             logger.info("Model loaded. Dimension: %d", self._dimension)
         except ImportError:
             raise RuntimeError(
