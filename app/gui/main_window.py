@@ -121,6 +121,9 @@ class MainWindow(QMainWindow):
             ("Graph", "🕸️", 6),
             ("Bulk", "📦", 7),
             ("Settings", "⚙️", 8),
+            ("Memory Stats", "📈", 9),
+            ("Graph Analysis", "🔬", 10),
+            ("API Server", "🌐", 11),
         ]
 
         for text, icon, index in pages:
@@ -158,6 +161,9 @@ class MainWindow(QMainWindow):
         self._graph_widget = None
         self._bulk_widget = None
         self._settings_widget = None
+        self._memory_stats_widget = None
+        self._graph_analysis_widget = None
+        self._api_server_widget = None
 
         self.stack.addWidget(QWidget())  # Dashboard placeholder
         self.stack.addWidget(self.search_widget)
@@ -168,6 +174,9 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(QWidget())  # Graph placeholder
         self.stack.addWidget(QWidget())  # Bulk placeholder
         self.stack.addWidget(QWidget())  # Settings placeholder
+        self.stack.addWidget(QWidget())  # Memory Stats placeholder
+        self.stack.addWidget(QWidget())  # Graph Analysis placeholder
+        self.stack.addWidget(QWidget())  # API Server placeholder
 
         main_layout.addWidget(self.stack)
 
@@ -226,6 +235,33 @@ class MainWindow(QMainWindow):
             self._settings_widget = SettingsWidget()
             self.stack.removeWidget(self.stack.widget(8))
             self.stack.insertWidget(8, self._settings_widget)
+
+        if index == 9 and self._memory_stats_widget is None:
+            try:
+                from app.gui.memory_stats_widget import MemoryStatsWidget
+                self._memory_stats_widget = MemoryStatsWidget()
+                self.stack.removeWidget(self.stack.widget(9))
+                self.stack.insertWidget(9, self._memory_stats_widget)
+            except Exception as e:
+                print(f"Failed to load memory stats widget: {e}")
+
+        if index == 10 and self._graph_analysis_widget is None:
+            try:
+                from app.gui.graph_analysis_widget import GraphAnalysisWidget
+                self._graph_analysis_widget = GraphAnalysisWidget()
+                self.stack.removeWidget(self.stack.widget(10))
+                self.stack.insertWidget(10, self._graph_analysis_widget)
+            except Exception as e:
+                print(f"Failed to load graph analysis widget: {e}")
+
+        if index == 11 and self._api_server_widget is None:
+            try:
+                from app.gui.api_server_widget import APIServerWidget
+                self._api_server_widget = APIServerWidget()
+                self.stack.removeWidget(self.stack.widget(11))
+                self.stack.insertWidget(11, self._api_server_widget)
+            except Exception as e:
+                print(f"Failed to load API server widget: {e}")
 
         self.stack.setCurrentIndex(index)
 
