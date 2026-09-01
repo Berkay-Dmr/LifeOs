@@ -61,7 +61,8 @@ class MainWindow(QMainWindow):
             ("Ask AI", 1),
             ("Memories", 2),
             ("Timeline", 3),
-            ("Settings", 4),
+            ("Graph", 4),
+            ("Settings", 5),
         ]
 
         for text, index in pages:
@@ -74,7 +75,7 @@ class MainWindow(QMainWindow):
         sidebar_layout.addStretch()
 
         # Version
-        version = QLabel("v0.1.0")
+        version = QLabel("v0.2.0")
         version.setObjectName("subtitleLabel")
         version.setAlignment(Qt.AlignCenter)
         sidebar_layout.addWidget(version)
@@ -88,13 +89,17 @@ class MainWindow(QMainWindow):
         self.ask_widget = AskWidget()
         self.memory_widget = MemoryWidget()
         self.timeline_widget = TimelineWidget()
-        self.settings_widget = SettingsWidget()
+
+        # Lazy load graph widget
+        self._graph_widget = None
+        self._settings_widget = None
 
         self.stack.addWidget(self.search_widget)
         self.stack.addWidget(self.ask_widget)
         self.stack.addWidget(self.memory_widget)
         self.stack.addWidget(self.timeline_widget)
-        self.stack.addWidget(self.settings_widget)
+        self.stack.addWidget(QWidget())  # Placeholder for graph
+        self.stack.addWidget(QWidget())  # Placeholder for settings
 
         main_layout.addWidget(self.stack)
 
@@ -105,6 +110,22 @@ class MainWindow(QMainWindow):
         self._switch_page(0)
 
     def _switch_page(self, index: int):
+        # Lazy load graph widget
+        if index == 4 and self._graph_widget is None:
+            try:
+                from app.graph.graph_widget import GraphWidget
+                self._graph_widget = GraphWidget()
+                self.stack.removeWidget(self.stack.widget(4))
+                self.stack.insertWidget(4, self._graph_widget)
+            except Exception as e:
+                print(f"Failed to load graph widget: {e}")
+
+        # Lazy load settings widget
+        if index == 5 and self._settings_widget is None:
+            self._settings_widget = SettingsWidget()
+            self.stack.removeWidget(self.stack.widget(5))
+            self.stack.insertWidget(5, self._settings_widget)
+
         self.stack.setCurrentIndex(index)
 
         for i, btn in enumerate(self._nav_buttons):
