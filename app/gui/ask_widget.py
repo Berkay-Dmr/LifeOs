@@ -9,6 +9,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QThread
 from PySide6.QtGui import QFont
 
+from app.gui.auto_complete import AutoCompleteLineEdit
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -322,7 +324,7 @@ class AskWidget(QWidget):
         self.file_filter.setFixedWidth(100)
         input_layout.addWidget(self.file_filter)
 
-        self.ask_input = QLineEdit()
+        self.ask_input = AutoCompleteLineEdit()
         self.ask_input.setObjectName("askInput")
         self.ask_input.setPlaceholderText("Ask anything about your files...")
         self.ask_input.returnPressed.connect(self._on_ask)

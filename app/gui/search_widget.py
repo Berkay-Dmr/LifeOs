@@ -153,7 +153,8 @@ class SearchWidget(QWidget):
         search_layout = QHBoxLayout()
         search_layout.setSpacing(12)
 
-        self.search_input = QLineEdit()
+        from app.gui.auto_complete import AutoCompleteLineEdit
+        self.search_input = AutoCompleteLineEdit()
         self.search_input.setObjectName("searchInput")
         self.search_input.setPlaceholderText("🔍  Type to search...")
         self.search_input.returnPressed.connect(self._on_search)
