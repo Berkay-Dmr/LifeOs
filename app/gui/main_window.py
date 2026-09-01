@@ -112,14 +112,15 @@ class MainWindow(QMainWindow):
         self._nav_buttons: list[QPushButton] = []
 
         pages = [
-            ("Search", "🔍", 0),
-            ("Ask AI", "💬", 1),
-            ("Projects", "📁", 2),
-            ("Memories", "🧠", 3),
-            ("Timeline", "📅", 4),
-            ("Graph", "🕸️", 5),
-            ("Bulk", "📦", 6),
-            ("Settings", "⚙️", 7),
+            ("Dashboard", "📊", 0),
+            ("Search", "🔍", 1),
+            ("Ask AI", "💬", 2),
+            ("Projects", "📁", 3),
+            ("Memories", "🧠", 4),
+            ("Timeline", "📅", 5),
+            ("Graph", "🕸️", 6),
+            ("Bulk", "📦", 7),
+            ("Settings", "⚙️", 8),
         ]
 
         for text, icon, index in pages:
@@ -152,11 +153,13 @@ class MainWindow(QMainWindow):
         self.memory_widget = MemoryWidget()
         self.timeline_widget = TimelineWidget()
 
+        self._dashboard_widget = None
         self._projects_widget = None
         self._graph_widget = None
         self._bulk_widget = None
         self._settings_widget = None
 
+        self.stack.addWidget(QWidget())  # Dashboard placeholder
         self.stack.addWidget(self.search_widget)
         self.stack.addWidget(self.ask_widget)
         self.stack.addWidget(QWidget())  # Projects placeholder
@@ -183,37 +186,46 @@ class MainWindow(QMainWindow):
 
     def _switch_page(self, index: int):
         # Lazy load widgets
-        if index == 2 and self._projects_widget is None:
+        if index == 0 and self._dashboard_widget is None:
+            try:
+                from app.gui.dashboard_widget import DashboardWidget
+                self._dashboard_widget = DashboardWidget()
+                self.stack.removeWidget(self.stack.widget(0))
+                self.stack.insertWidget(0, self._dashboard_widget)
+            except Exception as e:
+                print(f"Failed to load dashboard widget: {e}")
+
+        if index == 3 and self._projects_widget is None:
             try:
                 from app.gui.projects_widget import ProjectsWidget
                 self._projects_widget = ProjectsWidget()
-                self.stack.removeWidget(self.stack.widget(2))
-                self.stack.insertWidget(2, self._projects_widget)
+                self.stack.removeWidget(self.stack.widget(3))
+                self.stack.insertWidget(3, self._projects_widget)
             except Exception as e:
                 print(f"Failed to load projects widget: {e}")
 
-        if index == 5 and self._graph_widget is None:
+        if index == 6 and self._graph_widget is None:
             try:
                 from app.graph.graph_widget import GraphWidget
                 self._graph_widget = GraphWidget()
-                self.stack.removeWidget(self.stack.widget(5))
-                self.stack.insertWidget(5, self._graph_widget)
+                self.stack.removeWidget(self.stack.widget(6))
+                self.stack.insertWidget(6, self._graph_widget)
             except Exception as e:
                 print(f"Failed to load graph widget: {e}")
 
-        if index == 6 and self._bulk_widget is None:
+        if index == 7 and self._bulk_widget is None:
             try:
                 from app.gui.bulk_widget import BulkOperationsWidget
                 self._bulk_widget = BulkOperationsWidget()
-                self.stack.removeWidget(self.stack.widget(6))
-                self.stack.insertWidget(6, self._bulk_widget)
+                self.stack.removeWidget(self.stack.widget(7))
+                self.stack.insertWidget(7, self._bulk_widget)
             except Exception as e:
                 print(f"Failed to load bulk widget: {e}")
 
-        if index == 7 and self._settings_widget is None:
+        if index == 8 and self._settings_widget is None:
             self._settings_widget = SettingsWidget()
-            self.stack.removeWidget(self.stack.widget(7))
-            self.stack.insertWidget(7, self._settings_widget)
+            self.stack.removeWidget(self.stack.widget(8))
+            self.stack.insertWidget(8, self._settings_widget)
 
         self.stack.setCurrentIndex(index)
 
