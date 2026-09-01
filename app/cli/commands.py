@@ -614,6 +614,137 @@ def git_index(max_commits: int) -> None:
     console.print(f"[green]Indexed {count} commits.[/green]")
 
 
+# ── bulk-delete ──────────────────────────────────────────
+
+@cli.command(name="bulk-delete")
+@click.option("--ext", "-e", help="Delete by extension (e.g., .pdf)")
+@click.option("--pattern", "-p", help="Delete by name pattern")
+@click.option("--older-than", "-d", type=int, help="Delete files older than N days")
+@click.option("--dry-run", is_flag=True, help="Show what would be deleted")
+def bulk_delete(ext: str | None, pattern: str | None, older_than: int | None, dry_run: bool):
+    """Bulk delete documents from index."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.database.repositories import (
+        delete_documents_by_extension,
+        delete_documents_by_pattern,
+        delete_old_documents,
+        count_documents,
+    )
+
+    if not ext and not pattern and not older_than:
+        console.print("[red]Specify at least one filter: --ext, --pattern, or --older-than[/red]")
+        return
+
+    if ext:
+        before = count_documents()
+        if dry_run:
+            with get_connection() as conn:
+                cnt = conn.execute(
+                    "SELECT COUNT(*) FROM documents WHERE extension = ?", (ext,)
+                ).fetchone()[0]
+            console.print(f"[yellow]Dry run:[/yellow] Would delete {cnt} documents with extension '{ext}'")
+        else:
+            deleted = delete_documents_by_extension(ext)
+            console.print(f"[green]Deleted {deleted} documents with extension '{ext}'[/green]")
+
+    if pattern:
+        if dry_run:
+            with get_connection() as conn:
+                cnt = conn.execute(
+                    "SELECT COUNT(*) FROM documents WHERE name LIKE ?", (f"%{pattern}%",)
+                ).fetchone()[0]
+            console.print(f"[yellow]Dry run:[/yellow] Would delete {cnt} documents matching '{pattern}'")
+        else:
+            deleted = delete_documents_by_pattern(pattern)
+            console.print(f"[green]Deleted {deleted} documents matching '{pattern}'[/green]")
+
+    if older_than:
+        if dry_run:
+            from datetime import datetime, timedelta
+            cutoff = (datetime.utcnow() - timedelta(days=older_than)).isoformat()
+            with get_connection() as conn:
+                cnt = conn.execute(
+                    "SELECT COUNT(*) FROM documents WHERE modified_at < ?", (cutoff,)
+                ).fetchone()[0]
+            console.print(f"[yellow]Dry run:[/yellow] Would delete {cnt} documents older than {older_than} days")
+        else:
+            deleted = delete_old_documents(older_than)
+            console.print(f"[green]Deleted {deleted} documents older than {older_than} days[/green]")
+
+
+# ── bulk-reindex ──────────────────────────────────────────
+
+@cli.command(name="bulk-reindex")
+@click.option("--ext", "-e", help="Re-index by extension (e.g., .pdf)")
+@click.option("--all", "reindex_all", is_flag=True, help="Re-index all files")
+def bulk_reindex(ext: str | None, reindex_all: bool):
+    """Bulk re-index documents."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    if not ext and not reindex_all:
+        console.print("[red]Specify --ext or --all[/red]")
+        return
+
+    root = settings.root_path
+    if not root or not root.exists():
+        console.print(f"[red]Root directory not found:[/red] {root}")
+        return
+
+    from app.database.sqlite import get_connection
+    from app.ingestion.scanner import scan_directory
+
+    if reindex_all:
+        console.print("[cyan]Re-indexing all files...[/cyan]")
+        with get_connection() as conn:
+            conn.execute("DELETE FROM chunks")
+            conn.execute("DELETE FROM documents")
+        stats = scan_directory(root, settings)
+        console.print(f"[green]Done: {stats.new} indexed, {stats.skipped} skipped[/green]")
+    elif ext:
+        console.print(f"[cyan]Re-indexing files with extension '{ext}'...[/cyan]")
+        with get_connection() as conn:
+            doc_ids = [r["id"] for r in conn.execute(
+                "SELECT id FROM documents WHERE extension = ?", (ext,)
+            ).fetchall()]
+            if doc_ids:
+                placeholders = ",".join("?" * len(doc_ids))
+                conn.execute(f"DELETE FROM chunks WHERE document_id IN ({placeholders})", doc_ids)
+                conn.execute(f"DELETE FROM documents WHERE id IN ({placeholders})", doc_ids)
+        stats = scan_directory(root, settings)
+        console.print(f"[green]Done: {stats.new} indexed, {stats.skipped} skipped[/green]")
+
+
+# ── stats ──────────────────────────────────────────────────
+
+@cli.command()
+def stats():
+    """Show detailed index statistics."""
+    settings = _ensure_config()
+    _init_database(settings)
+
+    from app.database.repositories import get_extension_stats, count_chunks, count_documents
+
+    ext_stats = get_extension_stats()
+    doc_count = count_documents()
+    chunk_count = count_chunks()
+
+    table = Table(title="Index Statistics")
+    table.add_column("Extension", style="bold")
+    table.add_column("Count", justify="right")
+
+    for ext, cnt in ext_stats.items():
+        table.add_row(ext, str(cnt))
+
+    table.add_row("─" * 10, "─" * 5)
+    table.add_row("TOTAL", str(doc_count))
+
+    console.print(table)
+    console.print(f"Total chunks: {chunk_count}")
+
+
 # ── gui ────────────────────────────────────────────────────
 
 @cli.command()

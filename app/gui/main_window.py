@@ -62,7 +62,8 @@ class MainWindow(QMainWindow):
             ("Memories", 2),
             ("Timeline", 3),
             ("Graph", 4),
-            ("Settings", 5),
+            ("Bulk", 5),
+            ("Settings", 6),
         ]
 
         for text, index in pages:
@@ -92,6 +93,7 @@ class MainWindow(QMainWindow):
 
         # Lazy load graph widget
         self._graph_widget = None
+        self._bulk_widget = None
         self._settings_widget = None
 
         self.stack.addWidget(self.search_widget)
@@ -99,6 +101,7 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.memory_widget)
         self.stack.addWidget(self.timeline_widget)
         self.stack.addWidget(QWidget())  # Placeholder for graph
+        self.stack.addWidget(QWidget())  # Placeholder for bulk
         self.stack.addWidget(QWidget())  # Placeholder for settings
 
         main_layout.addWidget(self.stack)
@@ -120,11 +123,21 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 print(f"Failed to load graph widget: {e}")
 
+        # Lazy load bulk widget
+        if index == 5 and self._bulk_widget is None:
+            try:
+                from app.gui.bulk_widget import BulkOperationsWidget
+                self._bulk_widget = BulkOperationsWidget()
+                self.stack.removeWidget(self.stack.widget(5))
+                self.stack.insertWidget(5, self._bulk_widget)
+            except Exception as e:
+                print(f"Failed to load bulk widget: {e}")
+
         # Lazy load settings widget
-        if index == 5 and self._settings_widget is None:
+        if index == 6 and self._settings_widget is None:
             self._settings_widget = SettingsWidget()
-            self.stack.removeWidget(self.stack.widget(5))
-            self.stack.insertWidget(5, self._settings_widget)
+            self.stack.removeWidget(self.stack.widget(6))
+            self.stack.insertWidget(6, self._settings_widget)
 
         self.stack.setCurrentIndex(index)
 

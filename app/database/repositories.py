@@ -274,6 +274,70 @@ def get_chat_history(session_id: str, limit: int = 20) -> list[ChatMessage]:
         ]
 
 
+# ── Bulk Operations ─────────────────────────────────────────
+
+
+def delete_documents_by_extension(extension: str) -> int:
+    """Delete all documents with given extension and their chunks."""
+    with get_connection() as conn:
+        doc_ids = [r["id"] for r in conn.execute(
+            "SELECT id FROM documents WHERE extension = ?", (extension,)
+        ).fetchall()]
+        if not doc_ids:
+            return 0
+        placeholders = ",".join("?" * len(doc_ids))
+        conn.execute(f"DELETE FROM chunks WHERE document_id IN ({placeholders})", doc_ids)
+        conn.execute(f"DELETE FROM documents WHERE id IN ({placeholders})", doc_ids)
+        return len(doc_ids)
+
+
+def delete_documents_by_pattern(pattern: str) -> int:
+    """Delete documents whose name contains the pattern."""
+    with get_connection() as conn:
+        doc_ids = [r["id"] for r in conn.execute(
+            "SELECT id FROM documents WHERE name LIKE ?", (f"%{pattern}%",)
+        ).fetchall()]
+        if not doc_ids:
+            return 0
+        placeholders = ",".join("?" * len(doc_ids))
+        conn.execute(f"DELETE FROM chunks WHERE document_id IN ({placeholders})", doc_ids)
+        conn.execute(f"DELETE FROM documents WHERE id IN ({placeholders})", doc_ids)
+        return len(doc_ids)
+
+
+def delete_old_documents(days: int) -> int:
+    """Delete documents not modified in the last N days."""
+    from datetime import datetime, timedelta
+    cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+    with get_connection() as conn:
+        doc_ids = [r["id"] for r in conn.execute(
+            "SELECT id FROM documents WHERE modified_at < ?", (cutoff,)
+        ).fetchall()]
+        if not doc_ids:
+            return 0
+        placeholders = ",".join("?" * len(doc_ids))
+        conn.execute(f"DELETE FROM chunks WHERE document_id IN ({placeholders})", doc_ids)
+        conn.execute(f"DELETE FROM documents WHERE id IN ({placeholders})", doc_ids)
+        return len(doc_ids)
+
+
+def reindex_documents_by_extension(extension: str) -> list[str]:
+    """Return document IDs with given extension (for re-indexing)."""
+    with get_connection() as conn:
+        return [r["id"] for r in conn.execute(
+            "SELECT id FROM documents WHERE extension = ?", (extension,)
+        ).fetchall()]
+
+
+def get_extension_stats() -> dict[str, int]:
+    """Get document count per extension."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT extension, COUNT(*) as cnt FROM documents GROUP BY extension ORDER BY cnt DESC"
+        ).fetchall()
+        return {r["extension"]: r["cnt"] for r in rows}
+
+
 # ── Index Metadata ─────────────────────────────────────────
 
 def set_index_meta(key: str, value: str) -> None:
