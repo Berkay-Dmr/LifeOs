@@ -19,19 +19,60 @@ class AnswerCard(QFrame):
 
     def __init__(self, role: str, content: str, sources: list = None, parent=None):
         super().__init__(parent)
-        self.setObjectName("answerCard")
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+
+        if role == "assistant":
+            self.setStyleSheet("""
+                QFrame {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                        stop:0 #1a1535, stop:1 #1e1840);
+                    border: 1px solid rgba(187,154,247,0.3);
+                    border-radius: 14px;
+                    padding: 16px;
+                }
+            """)
+        else:
+            self.setStyleSheet("""
+                QFrame {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                        stop:0 #152015, stop:1 #182818);
+                    border: 1px solid rgba(158,206,106,0.3);
+                    border-radius: 14px;
+                    padding: 16px;
+                }
+            """)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(8)
         layout.setContentsMargins(16, 12, 16, 12)
 
-        # Role label
-        role_label = QLabel("Sen" if role == "user" else "AI")
-        role_label.setStyleSheet(
-            "font-weight: bold; color: #7aa2f7;" if role == "assistant"
-            else "font-weight: bold; color: #9ece6a;"
-        )
+        # Role badge
+        if role == "assistant":
+            role_label = QLabel("AI")
+            role_label.setStyleSheet("""
+                QLabel {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 #bb9af7, stop:1 #9a7af7);
+                    color: white;
+                    border-radius: 6px;
+                    padding: 2px 8px;
+                    font-weight: bold;
+                    font-size: 11px;
+                }
+            """)
+        else:
+            role_label = QLabel("You")
+            role_label.setStyleSheet("""
+                QLabel {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 #9ece6a, stop:1 #80b855);
+                    color: #1a1b26;
+                    border-radius: 6px;
+                    padding: 2px 8px;
+                    font-weight: bold;
+                    font-size: 11px;
+                }
+            """)
         layout.addWidget(role_label)
 
         # Content
@@ -48,9 +89,21 @@ class AnswerCard(QFrame):
 
         # Sources (only for assistant)
         if sources and role == "assistant":
-            sources_label = QLabel("Kaynaklar:")
-            sources_label.setStyleSheet("font-weight: bold; color: #7aa2f7; margin-top: 4px; font-size: 11px;")
-            layout.addWidget(sources_label)
+            sources_frame = QFrame()
+            sources_frame.setStyleSheet("""
+                QFrame {
+                    background: rgba(122,162,247,0.1);
+                    border-radius: 8px;
+                    padding: 8px;
+                }
+            """)
+            sources_layout = QVBoxLayout(sources_frame)
+            sources_layout.setContentsMargins(8, 6, 8, 6)
+            sources_layout.setSpacing(4)
+
+            sources_label = QLabel("Sources:")
+            sources_label.setStyleSheet("font-weight: bold; color: #7aa2f7; font-size: 11px; background: transparent;")
+            sources_layout.addWidget(sources_label)
 
             for i, src in enumerate(sources[:5], 1):
                 if hasattr(src, "path"):
@@ -59,10 +112,12 @@ class AnswerCard(QFrame):
                 else:
                     path = src.get("path", "unknown")
                     score = src.get("score", 0)
-                src_text = f"[{i}] {path} ({score:.0%})"
+                src_text = f"[{i}] {path.split('/')[-1].split(chr(92))[-1]} ({score:.0%})"
                 src_label = QLabel(src_text)
-                src_label.setStyleSheet("color: #9ece6a; font-size: 11px; padding-left: 12px;")
-                layout.addWidget(src_label)
+                src_label.setStyleSheet("color: #9ece6a; font-size: 11px; background: transparent;")
+                sources_layout.addWidget(src_label)
+
+            layout.addWidget(sources_frame)
 
 
 class AskWorker(QThread):
@@ -147,7 +202,7 @@ class AskWidget(QWidget):
         super().__init__(parent)
         self._worker = None
         self._current_session_id = None
-        self._chat_history = []  # [{role, content}, ...]
+        self._chat_history = []
         self._init_ui()
         self._load_sessions()
 
@@ -158,42 +213,72 @@ class AskWidget(QWidget):
 
         # Title bar
         title_bar = QHBoxLayout()
-        title_bar.setContentsMargins(32, 16, 32, 8)
+        title_bar.setContentsMargins(36, 20, 36, 12)
 
         title = QLabel("Ask AI")
         title.setObjectName("titleLabel")
         title_bar.addWidget(title)
+
         title_bar.addStretch()
 
-        new_chat_btn = QPushButton("+ Yeni Sohbet")
+        new_chat_btn = QPushButton("+ New Chat")
         new_chat_btn.setObjectName("primaryBtn")
+        new_chat_btn.setCursor(Qt.PointingHandCursor)
         new_chat_btn.clicked.connect(self._new_session)
         title_bar.addWidget(new_chat_btn)
 
         layout.addLayout(title_bar)
 
-        # Main content: sidebar + chat
+        # Main content
         splitter = QSplitter(Qt.Horizontal)
-        splitter.setHandleWidth(1)
+        splitter.setHandleWidth(2)
 
         # Left sidebar: session list
         sidebar = QFrame()
-        sidebar.setFixedWidth(200)
-        sidebar.setStyleSheet("QFrame { border-right: 1px solid #333; }")
+        sidebar.setFixedWidth(220)
+        sidebar.setStyleSheet("""
+            QFrame {
+                background: rgba(18,18,42,0.8);
+                border-right: 1px solid #2a2a4a;
+            }
+        """)
         sidebar_layout = QVBoxLayout(sidebar)
-        sidebar_layout.setContentsMargins(8, 8, 8, 8)
+        sidebar_layout.setContentsMargins(12, 12, 12, 12)
 
-        sidebar_label = QLabel("Sohbetler")
-        sidebar_label.setStyleSheet("font-weight: bold; color: #7aa2f7; padding: 4px;")
+        sidebar_label = QLabel("Chats")
+        sidebar_label.setStyleSheet("""
+            font-weight: bold;
+            color: #7aa2f7;
+            padding: 4px;
+            font-size: 12px;
+        """)
         sidebar_layout.addWidget(sidebar_label)
 
         self.session_list = QListWidget()
-        self.session_list.setStyleSheet("QListWidget { border: none; }")
+        self.session_list.setStyleSheet("""
+            QListWidget {
+                border: none;
+                background: transparent;
+            }
+            QListWidget::item {
+                padding: 8px;
+                border-radius: 8px;
+                margin: 2px 0;
+            }
+            QListWidget::item:hover {
+                background: rgba(122,162,247,0.15);
+            }
+            QListWidget::item:selected {
+                background: rgba(122,162,247,0.25);
+                color: #e0e0f0;
+            }
+        """)
         self.session_list.currentRowChanged.connect(self._on_session_selected)
         sidebar_layout.addWidget(self.session_list)
 
-        delete_btn = QPushButton("Sil")
-        delete_btn.clicked.connect(self._delete_session)
+        delete_btn = QPushButton("Delete")
+        delete_btn.setObjectName("dangerBtn")
+        delete_btn.setCursor(Qt.PointingHandCursor)
         sidebar_layout.addWidget(delete_btn)
 
         splitter.addWidget(sidebar)
@@ -201,8 +286,8 @@ class AskWidget(QWidget):
         # Right: chat area
         chat_widget = QWidget()
         chat_layout = QVBoxLayout(chat_widget)
-        chat_layout.setContentsMargins(16, 8, 16, 8)
-        chat_layout.setSpacing(8)
+        chat_layout.setContentsMargins(20, 12, 20, 12)
+        chat_layout.setSpacing(12)
 
         # Chat scroll
         self.chat_scroll = QScrollArea()
@@ -212,34 +297,44 @@ class AskWidget(QWidget):
         self.chat_container = QWidget()
         self.chat_layout = QVBoxLayout(self.chat_container)
         self.chat_layout.setContentsMargins(0, 0, 0, 0)
-        self.chat_layout.setSpacing(8)
+        self.chat_layout.setSpacing(12)
         self.chat_layout.addStretch()
 
         self.chat_scroll.setWidget(self.chat_container)
         chat_layout.addWidget(self.chat_scroll)
 
         # Input bar
-        input_layout = QHBoxLayout()
-        input_layout.setSpacing(8)
+        input_frame = QFrame()
+        input_frame.setStyleSheet("""
+            QFrame {
+                background: rgba(26,26,53,0.8);
+                border: 1px solid #2a2a50;
+                border-radius: 16px;
+                padding: 8px;
+            }
+        """)
+        input_layout = QHBoxLayout(input_frame)
+        input_layout.setSpacing(10)
+        input_layout.setContentsMargins(12, 8, 12, 8)
 
         self.file_filter = QComboBox()
-        self.file_filter.addItems(["Tümü", "PDF", "Belge", "Kod", "Görsel"])
+        self.file_filter.addItems(["All", "PDF", "Document", "Code", "Image"])
         self.file_filter.setFixedWidth(100)
-        self.file_filter.setStyleSheet("QComboBox { padding: 4px; }")
         input_layout.addWidget(self.file_filter)
 
         self.ask_input = QLineEdit()
         self.ask_input.setObjectName("askInput")
-        self.ask_input.setPlaceholderText("Sorunuzu yazın...")
+        self.ask_input.setPlaceholderText("Ask anything about your files...")
         self.ask_input.returnPressed.connect(self._on_ask)
         input_layout.addWidget(self.ask_input)
 
-        self.ask_btn = QPushButton("Gönder")
+        self.ask_btn = QPushButton("Send")
         self.ask_btn.setObjectName("primaryBtn")
+        self.ask_btn.setCursor(Qt.PointingHandCursor)
         self.ask_btn.clicked.connect(self._on_ask)
         input_layout.addWidget(self.ask_btn)
 
-        chat_layout.addLayout(input_layout)
+        chat_layout.addWidget(input_frame)
 
         splitter.addWidget(chat_widget)
         splitter.setStretchFactor(0, 0)
@@ -248,8 +343,6 @@ class AskWidget(QWidget):
         layout.addWidget(splitter)
 
     def _load_sessions(self):
-        """Load session list from DB."""
-        from app.database.repositories import get_chat_history
         from app.database.sqlite import get_connection
 
         self.session_list.clear()
@@ -263,14 +356,12 @@ class AskWidget(QWidget):
                 self.session_list.addItem(item)
 
     def _new_session(self):
-        """Start a new chat session."""
         self._current_session_id = None
         self._chat_history = []
         self._clear_chat()
         self.ask_input.setFocus()
 
     def _on_session_selected(self, row: int):
-        """Load a previous session."""
         if row < 0:
             return
         item = self.session_list.item(row)
@@ -291,7 +382,6 @@ class AskWidget(QWidget):
             self._add_message_card(msg.role, msg.content)
 
     def _delete_session(self):
-        """Delete selected session."""
         item = self.session_list.currentItem()
         if not item:
             return
@@ -306,7 +396,6 @@ class AskWidget(QWidget):
         self._new_session()
 
     def _clear_chat(self):
-        """Clear chat display."""
         while self.chat_layout.count() > 1:
             item = self.chat_layout.takeAt(0)
             if item.widget():
@@ -319,11 +408,9 @@ class AskWidget(QWidget):
         if self._worker and self._worker.isRunning():
             return
 
-        # Get file type filter
         filter_map = {0: None, 1: "pdf", 2: "doc", 3: "code", 4: "image"}
         file_type = filter_map.get(self.file_filter.currentIndex())
 
-        # Create session if needed
         if not self._current_session_id:
             from app.database.repositories import create_chat_session
             title = question[:50] + ("..." if len(question) > 50 else "")
@@ -331,19 +418,16 @@ class AskWidget(QWidget):
             self._current_session_id = session.id
             self._load_sessions()
 
-        # Save user message
         from app.database.repositories import add_chat_message
         add_chat_message(self._current_session_id, "user", question)
         self._chat_history.append({"role": "user", "content": question})
 
-        # Show user message
         self._add_message_card("user", question)
 
-        # Clear input
         self.ask_input.clear()
         self.ask_btn.setEnabled(False)
+        self.ask_btn.setText("Thinking...")
 
-        # Start AI worker
         self._worker = AskWorker(question, self._chat_history[:-1], file_type)
         self._worker.finished.connect(self._on_answer)
         self._worker.error.connect(self._on_error)
@@ -351,23 +435,22 @@ class AskWidget(QWidget):
 
     def _on_answer(self, answer: str, sources: list):
         self.ask_btn.setEnabled(True)
+        self.ask_btn.setText("Send")
 
-        # Save assistant message
         from app.database.repositories import add_chat_message
         add_chat_message(self._current_session_id, "assistant", answer)
         self._chat_history.append({"role": "assistant", "content": answer})
 
-        # Show assistant message
         self._add_message_card("assistant", answer, sources)
 
     def _on_error(self, error: str):
         self.ask_btn.setEnabled(True)
-        self._add_message_card("assistant", f"Hata: {error}")
+        self.ask_btn.setText("Send")
+        self._add_message_card("assistant", f"Error: {error}")
 
     def _add_message_card(self, role: str, content: str, sources: list = None):
         card = AnswerCard(role, content, sources)
         self.chat_layout.insertWidget(self.chat_layout.count() - 1, card)
 
-        # Scroll to bottom
         sb = self.chat_scroll.verticalScrollBar()
         sb.setValue(sb.maximum())

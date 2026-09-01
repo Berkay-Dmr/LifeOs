@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QButtonGroup, QDateEdit, QComboBox,
 )
 from PySide6.QtCore import Qt, Signal, QThread, QDate
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QColor, QLinearGradient
 
 import logging
 
@@ -14,44 +14,69 @@ logger = logging.getLogger(__name__)
 
 
 class ResultCard(QFrame):
-    """A single search result card."""
+    """A single search result card with gradient styling."""
 
     def __init__(self, title: str, snippet: str, score: float, source: str, parent=None):
         super().__init__(parent)
         self.setObjectName("resultCard")
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+        self.setCursor(Qt.PointingHandCursor)
 
         layout = QVBoxLayout(self)
-        layout.setSpacing(6)
-        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(8)
+        layout.setContentsMargins(18, 14, 18, 14)
 
+        # Header row
         header = QHBoxLayout()
-        header.setSpacing(12)
+        header.setSpacing(14)
 
+        # Score badge
         score_label = QLabel(f"{score:.0%}")
         score_label.setObjectName("scoreLabel")
-        score_label.setFixedWidth(40)
+        score_label.setFixedWidth(48)
+        score_label.setAlignment(Qt.AlignCenter)
+        score_label.setStyleSheet(f"""
+            QLabel {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #e0af68, stop:1 #ff9e64);
+                color: #1a1b26;
+                border-radius: 10px;
+                padding: 4px;
+                font-weight: bold;
+                font-size: 11px;
+            }}
+        """)
         header.addWidget(score_label)
 
-        source_label = QLabel(source)
+        # Source tag
+        source_label = QLabel(source.split("/")[-1].split("\\")[-1])
         source_label.setObjectName("sourceLabel")
         header.addWidget(source_label)
 
         header.addStretch()
         layout.addLayout(header)
 
+        # Title
         title_lbl = QLabel(title)
         title_lbl.setWordWrap(True)
-        font = title_lbl.font()
-        font.setBold(True)
-        font.setPointSize(11)
-        title_lbl.setFont(font)
+        title_lbl.setStyleSheet("""
+            font-size: 14px;
+            font-weight: bold;
+            color: #e0e0f0;
+            padding: 2px 0;
+        """)
         layout.addWidget(title_lbl)
 
+        # Snippet
         if snippet:
             snippet_lbl = QLabel(snippet[:300])
             snippet_lbl.setWordWrap(True)
-            snippet_lbl.setStyleSheet("color: #787c99; font-size: 12px;")
+            snippet_lbl.setStyleSheet("""
+                color: #8888aa;
+                font-size: 12px;
+                line-height: 1.4;
+                padding: 4px 0;
+            """)
             layout.addWidget(snippet_lbl)
 
 
@@ -110,20 +135,27 @@ class SearchWidget(QWidget):
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(32, 24, 32, 24)
-        layout.setSpacing(12)
+        layout.setContentsMargins(36, 28, 36, 28)
+        layout.setSpacing(16)
 
-        title = QLabel("Search")
+        # Title with gradient
+        title = QLabel("Search Your Knowledge")
         title.setObjectName("titleLabel")
         layout.addWidget(title)
 
+        subtitle = QLabel("Find anything across your indexed files")
+        subtitle.setObjectName("subtitleLabel")
+        layout.addWidget(subtitle)
+
+        layout.addSpacing(8)
+
         # Search bar
         search_layout = QHBoxLayout()
-        search_layout.setSpacing(8)
+        search_layout.setSpacing(12)
 
         self.search_input = QLineEdit()
         self.search_input.setObjectName("searchInput")
-        self.search_input.setPlaceholderText("Search your knowledge base...")
+        self.search_input.setPlaceholderText("🔍  Type to search...")
         self.search_input.returnPressed.connect(self._on_search)
         search_layout.addWidget(self.search_input)
 
@@ -135,74 +167,110 @@ class SearchWidget(QWidget):
         layout.addLayout(search_layout)
 
         # File type filter buttons
-        filter_layout = QHBoxLayout()
-        filter_layout.setSpacing(4)
+        filter_frame = QFrame()
+        filter_frame.setStyleSheet("""
+            QFrame {
+                background: rgba(122,162,247,0.08);
+                border-radius: 12px;
+                padding: 8px;
+            }
+        """)
+        filter_layout = QHBoxLayout(filter_frame)
+        filter_layout.setSpacing(6)
+        filter_layout.setContentsMargins(12, 8, 12, 8)
 
-        filter_label = QLabel("Tur:")
-        filter_label.setStyleSheet("color: #787c99; font-size: 12px;")
+        filter_label = QLabel("Filter:")
+        filter_label.setStyleSheet("color: #8888aa; font-size: 12px; background: transparent;")
         filter_layout.addWidget(filter_label)
 
         self.filter_group = QButtonGroup(self)
         self.filter_group.setExclusive(True)
 
         filters = [
-            ("Tumu", None),
+            ("All", None),
             ("PDF", "pdf"),
-            ("Belge", "doc"),
-            ("Kod", "code"),
-            ("Gorsel", "image"),
+            ("Document", "doc"),
+            ("Code", "code"),
+            ("Image", "image"),
         ]
 
         for label, value in filters:
             btn = QPushButton(label)
             btn.setCheckable(True)
+            btn.setCursor(Qt.PointingHandCursor)
             if value is None:
                 btn.setChecked(True)
-            btn.setStyleSheet(
-                "QPushButton { padding: 4px 12px; border-radius: 4px; font-size: 12px; }"
-                "QPushButton:checked { background: #7aa2f7; color: white; }"
-                "QPushButton:!checked { background: #333; color: #aaa; }"
-            )
+            btn.setStyleSheet("""
+                QPushButton {
+                    padding: 6px 16px;
+                    border-radius: 8px;
+                    font-size: 12px;
+                    background: transparent;
+                    color: #8888aa;
+                    border: 1px solid transparent;
+                }
+                QPushButton:hover {
+                    background: rgba(122,162,247,0.1);
+                    color: #c0c0e0;
+                }
+                QPushButton:checked {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 #7aa2f7, stop:1 #5a8af7);
+                    color: white;
+                    font-weight: bold;
+                    border: none;
+                }
+            """)
             self.filter_group.addButton(btn, id=filters.index((label, value)))
             btn.clicked.connect(lambda checked, v=value: self._set_filter(v))
             filter_layout.addWidget(btn)
 
         filter_layout.addStretch()
-        layout.addLayout(filter_layout)
+        layout.addWidget(filter_frame)
 
         # Advanced filters (collapsible)
         advanced_frame = QFrame()
-        advanced_frame.setStyleSheet("QFrame { border: 1px solid #333; border-radius: 4px; padding: 8px; }")
+        advanced_frame.setStyleSheet("""
+            QFrame {
+                background: rgba(187,154,247,0.06);
+                border: 1px solid rgba(187,154,247,0.2);
+                border-radius: 12px;
+                padding: 12px;
+            }
+        """)
         advanced_layout = QVBoxLayout(advanced_frame)
-        advanced_layout.setSpacing(8)
+        advanced_layout.setSpacing(10)
 
-        advanced_title = QLabel("Gelismisi Filtreler")
-        advanced_title.setStyleSheet("font-weight: bold; color: #7aa2f7; font-size: 12px;")
+        advanced_title = QLabel("Advanced Filters")
+        advanced_title.setStyleSheet("""
+            font-weight: bold;
+            color: #bb9af7;
+            font-size: 12px;
+            background: transparent;
+        """)
         advanced_layout.addWidget(advanced_title)
 
         # Date range
         date_layout = QHBoxLayout()
-        date_layout.setSpacing(8)
+        date_layout.setSpacing(10)
 
-        date_from_label = QLabel("Baslangic:")
-        date_from_label.setStyleSheet("font-size: 12px;")
+        date_from_label = QLabel("From:")
+        date_from_label.setStyleSheet("color: #8888aa; font-size: 12px; background: transparent;")
         date_layout.addWidget(date_from_label)
 
         self.date_from = QDateEdit()
         self.date_from.setCalendarPopup(True)
         self.date_from.setDisplayFormat("yyyy-MM-dd")
         self.date_from.setDate(self.date_from.date().addYears(-1))
-        self.date_from.setStyleSheet("font-size: 12px;")
         date_layout.addWidget(self.date_from)
 
-        date_to_label = QLabel("Bitis:")
-        date_to_label.setStyleSheet("font-size: 12px;")
+        date_to_label = QLabel("To:")
+        date_to_label.setStyleSheet("color: #8888aa; font-size: 12px; background: transparent;")
         date_layout.addWidget(date_to_label)
 
         self.date_to = QDateEdit()
         self.date_to.setCalendarPopup(True)
         self.date_to.setDisplayFormat("yyyy-MM-dd")
-        self.date_to.setStyleSheet("font-size: 12px;")
         date_layout.addWidget(self.date_to)
 
         date_layout.addStretch()
@@ -210,15 +278,27 @@ class SearchWidget(QWidget):
 
         # Filename search
         filename_layout = QHBoxLayout()
-        filename_layout.setSpacing(8)
+        filename_layout.setSpacing(10)
 
-        filename_label = QLabel("Dosya adi:")
-        filename_label.setStyleSheet("font-size: 12px;")
+        filename_label = QLabel("Filename:")
+        filename_label.setStyleSheet("color: #8888aa; font-size: 12px; background: transparent;")
         filename_layout.addWidget(filename_label)
 
         self.filename_input = QLineEdit()
-        self.filename_input.setPlaceholderText("Dosya adinda ara...")
-        self.filename_input.setStyleSheet("font-size: 12px;")
+        self.filename_input.setPlaceholderText("Search in filename...")
+        self.filename_input.setStyleSheet("""
+            QLineEdit {
+                background: rgba(15,15,26,0.6);
+                border: 1px solid #2a2a50;
+                border-radius: 8px;
+                padding: 6px 12px;
+                color: #e0e0f0;
+                min-width: 200px;
+            }
+            QLineEdit:focus {
+                border-color: #7aa2f7;
+            }
+        """)
         filename_layout.addWidget(self.filename_input)
 
         advanced_layout.addLayout(filename_layout)
@@ -238,7 +318,7 @@ class SearchWidget(QWidget):
         self.results_container = QWidget()
         self.results_layout = QVBoxLayout(self.results_container)
         self.results_layout.setContentsMargins(0, 0, 0, 0)
-        self.results_layout.setSpacing(8)
+        self.results_layout.setSpacing(10)
         self.results_layout.addStretch()
 
         scroll.setWidget(self.results_container)
@@ -254,19 +334,16 @@ class SearchWidget(QWidget):
         if self._worker and self._worker.isRunning():
             return
 
-        # Get advanced filters
         date_from = self.date_from.date().toString("yyyy-MM-dd")
         date_to = self.date_to.date().toString("yyyy-MM-dd")
         filename = self.filename_input.text().strip() or None
 
         self.search_btn.setEnabled(False)
-        self.count_label.setText("Araniyor...")
+        self.search_btn.setText("Searching...")
+        self.count_label.setText("Searching across your knowledge base...")
         self._worker = SearchWorker(
-            query,
-            self._current_filter,
-            date_from=date_from,
-            date_to=date_to,
-            filename=filename,
+            query, self._current_filter,
+            date_from=date_from, date_to=date_to, filename=filename,
         )
         self._worker.finished.connect(self._on_results)
         self._worker.error.connect(self._on_error)
@@ -274,11 +351,13 @@ class SearchWidget(QWidget):
 
     def _on_results(self, results: list):
         self.search_btn.setEnabled(True)
+        self.search_btn.setText("Search")
         self._show_results(results)
 
     def _on_error(self, error: str):
         self.search_btn.setEnabled(True)
-        self.count_label.setText(f"Hata: {error}")
+        self.search_btn.setText("Search")
+        self.count_label.setText(f"Error: {error}")
 
     def _show_results(self, results: list):
         while self.results_layout.count() > 1:
@@ -288,7 +367,7 @@ class SearchWidget(QWidget):
 
         self._results = results
         filter_text = f" ({self._current_filter})" if self._current_filter else ""
-        self.count_label.setText(f"{len(results)} sonuc bulundu{filter_text}")
+        self.count_label.setText(f"{len(results)} results found{filter_text}")
 
         for r in results:
             if hasattr(r, "path"):
